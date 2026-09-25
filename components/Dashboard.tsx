@@ -1,14 +1,14 @@
 "use client";
 import {useMemo,useState} from "react";
 import {Search,Network,ShieldCheck,FileText,Clock3,Plus,ChevronRight,Building2,UserRound,Globe2,Tags,MapPin,X,ExternalLink} from "lucide-react";
-import {cases} from "@/lib/data"; import {Confidence,IntelNode} from "@/lib/types";
+import {cases} from "@/lib/data"; import {Confidence,Edge,IntelNode} from "@/lib/types";
 const cc:Record<Confidence,string>={confirmed:"#35d07f",strong:"#4aa8ff",correlation:"#f5b942",lead:"#929baa",excluded:"#ff6470"};
 const icons:any={brand:Globe2,person:UserRound,company:Building2,trademark:Tags,domain:Globe2,address:MapPin};
 function Badge({c}:{c:Confidence}){return <span className="badge" style={{color:cc[c],borderColor:cc[c]+"55",background:cc[c]+"12"}}><i style={{background:cc[c]}}/>{c}</span>}
-function Graph({nodes,edges,onPick}:{nodes:IntelNode[],edges:any[],onPick:(n:IntelNode)=>void}){
+function Graph({nodes,edges,onPick}:{nodes:IntelNode[],edges:Edge[],onPick:(n:IntelNode)=>void}){
  const by=Object.fromEntries(nodes.map(n=>[n.id,n])); return <div className="graph"><svg viewBox="0 0 900 510" preserveAspectRatio="xMidYMid meet">
  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8z" fill="#526071"/></marker></defs>
- {edges.map((e:any,i:number)=>{let a=by[e.from],b=by[e.to];if(!a||!b)return null;return <g key={i}><line x1={a.x+65} y1={a.y+22} x2={b.x+65} y2={b.y+22} stroke={cc[e.confidence]} strokeOpacity=".55" strokeWidth="1.6" markerEnd="url(#arrow)"/><text x={(a.x+b.x)/2+65} y={(a.y+b.y)/2+14} className="edgeLabel">{e.label}</text></g>})}
+ {edges.map((e:Edge,i:number)=>{let a=by[e.from],b=by[e.to];if(!a||!b)return null;return <g key={i}><line x1={a.x+65} y1={a.y+22} x2={b.x+65} y2={b.y+22} stroke={cc[e.confidence]} strokeOpacity=".55" strokeWidth="1.6" markerEnd="url(#arrow)"/><text x={(a.x+b.x)/2+65} y={(a.y+b.y)/2+14} className="edgeLabel">{e.label}</text></g>})}
  {nodes.map(n=>{const I=icons[n.type]||Globe2;return <g key={n.id} onClick={()=>onPick(n)} className="node" transform={`translate(${n.x},${n.y})`}><rect width="145" height="55" rx="10" fill="#101923" stroke={cc[n.confidence]} strokeOpacity=".55"/><circle cx="20" cy="27" r="12" fill={cc[n.confidence]+"20"}/><foreignObject x="12" y="19" width="16" height="16"><I size={16} color={cc[n.confidence]}/></foreignObject><text x="39" y="23" className="nodeTitle">{n.label.length>18?n.label.slice(0,18)+"…":n.label}</text><text x="39" y="39" className="nodeSub">{n.subtitle.length>20?n.subtitle.slice(0,20)+"…":n.subtitle}</text></g>})}</svg></div>
 }
 export default function Dashboard(){
