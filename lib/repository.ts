@@ -21,3 +21,12 @@ export async function saveProviderFindings(input:{investigationId:string;jobId:s
  await request("oi_sources?on_conflict=investigation_id,url",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=representation"},body:JSON.stringify(sources)});
  return rows;
 }
+
+export async function deleteInvestigation(id:string){
+ if(!hasDb())throw new Error("Database is not configured");
+ const q=encodeURIComponent(id);
+ for(const table of ["oi_evidence_links","oi_provider_findings","oi_sources"])await request(table+"?investigation_id=eq."+q,{method:"DELETE"});
+ await request("oi_research_jobs?investigation_id=eq."+q,{method:"DELETE"});
+ await request("investigations?id=eq."+q,{method:"DELETE"});
+ return {id};
+}
