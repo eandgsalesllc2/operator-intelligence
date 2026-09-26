@@ -1,5 +1,6 @@
 import {Case} from "./types";
 import {cases as seedCases} from "./data";
+import {ProviderFinding} from "./providers";
 
 const hasDb=()=>Boolean(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY);
 async function request(path:string,init?:RequestInit){const url=process.env.SUPABASE_URL;const key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!url||!key)throw new Error("Database is not configured");const r=await fetch(url+"/rest/v1/"+path,{...init,headers:{apikey:key,Authorization:"Bearer "+key,"Content-Type":"application/json",Prefer:"return=representation",...(init?.headers||{})},cache:"no-store"});if(!r.ok)throw new Error(await r.text());return r.status===204?null:r.json()}
@@ -7,8 +8,16 @@ export async function listInvestigations():Promise<Case[]>{if(!hasDb())return se
 export async function saveInvestigation(c:Case){if(!hasDb())throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");await request("investigations?on_conflict=id",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=representation"},body:JSON.stringify({id:c.id,name:c.name,domain:c.domain,status:c.status,summary:c.summary,updated_at:new Date().toISOString()})});for(const table of ["relationships","entities","evidence","timeline","open_questions"])await request(table+"?investigation_id=eq."+encodeURIComponent(c.id),{method:"DELETE"});if(c.nodes.length)await request("entities",{method:"POST",body:JSON.stringify(c.nodes.map(n=>({...n,investigation_id:c.id})))});if(c.edges.length)await request("relationships",{method:"POST",body:JSON.stringify(c.edges.map(e=>({investigation_id:c.id,from_entity:e.from,to_entity:e.to,label:e.label,confidence:e.confidence})))});if(c.evidence.length)await request("evidence",{method:"POST",body:JSON.stringify(c.evidence.map(e=>({...e,investigation_id:c.id})))});if(c.timeline.length)await request("timeline",{method:"POST",body:JSON.stringify(c.timeline.map(t=>({investigation_id:c.id,event_date:t.date,title:t.title,body:t.body})))});if(c.openQuestions.length)await request("open_questions",{method:"POST",body:JSON.stringify(c.openQuestions.map(question=>({investigation_id:c.id,question})))});return c}
 export function databaseConfigured(){return hasDb()}
 
-
 export async function listResearchJobs(investigationId:string){if(!hasDb())return [];return request("oi_research_jobs?investigation_id=eq."+encodeURIComponent(investigationId)+"&select=*&order=created_at.desc")}
 export async function listResearchSources(investigationId:string){if(!hasDb())return [];return request("oi_sources?investigation_id=eq."+encodeURIComponent(investigationId)+"&select=*&order=retrieved_at.desc")}
 export async function queueResearchJob(input:{investigationId:string;seedEntityId?:string|null;seedValue:string;seedType:string;maxDepth?:number}){const id="job_"+Date.now().toString(36);const rows=await request("oi_research_jobs",{method:"POST",body:JSON.stringify({id,investigation_id:input.investigationId,seed_entity_id:input.seedEntityId||null,seed_value:input.seedValue,seed_type:input.seedType,status:"queued",depth:0,max_depth:Math.max(1,Math.min(input.maxDepth||3,5)),provider:"pending",progress:0,message:"Queued for research",error:""})});return rows[0]}
 export async function updateResearchJob(id:string,patch:Record<string,unknown>){const rows=await request("oi_research_jobs?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({...patch,updated_at:new Date().toISOString()})});return rows[0]}
+export async function saveProviderFindings(input:{investigationId:string;jobId:string;provider:string;findings:ProviderFinding[]}){
+ if(!input.findings.length)return [];
+ const stamp=Date.now().toString(36);
+ const rows=input.findings.map((f,i)=>({id:"finding_"+stamp+"_"+i,investigation_id:input.investigationId,research_job_id:input.jobId,provider:input.provider,title:f.title,url:f.url,publisher:f.publisher,snippet:f.snippet,source_type:f.sourceType,entities:f.entities,claims:f.claims,status:"pending"}));
+ await request("oi_provider_findings",{method:"POST",body:JSON.stringify(rows)});
+ const sources=input.findings.map((f,i)=>({id:"source_"+stamp+"_"+i,investigation_id:input.investigationId,research_job_id:input.jobId,url:f.url,title:f.title,source_type:f.sourceType,publisher:f.publisher,snippet:f.snippet,metadata:{provider:input.provider}}));
+ await request("oi_sources?on_conflict=investigation_id,url",{method:"POST",headers:{Prefer:"resolution=merge-duplicates,return=representation"},body:JSON.stringify(sources)});
+ return rows;
+}
