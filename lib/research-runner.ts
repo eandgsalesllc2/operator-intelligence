@@ -8,6 +8,7 @@ export async function runResearchJob(job:any){
  let total=0;
  const active=providers.filter(p=>p.supports(seedType));
  try{
+  if(!active.length)throw new Error("No research provider supports seed type: "+seedType);
   for(let i=0;i<active.length;i++){
    const provider=active[i];
    await updateResearchJob(job.id,{provider:provider.name,progress:10+Math.floor((i/Math.max(active.length,1))*70),message:"Running "+provider.name+" research"});
