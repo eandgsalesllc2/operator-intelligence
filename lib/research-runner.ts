@@ -130,6 +130,16 @@ export async function runResearchJob(job:any){
      addEvidence(d,{title:`Shared ${KIND_LABEL[m.kind]||m.kind} with ${m.name}`,source:`/investigations/${m.investigation_id}`,confidence:"correlation",note:`${m.value} appears on both. Shared tracking IDs, accounts and contacts point to a common operator; confirm with registry or trademark records.`})}
     drafts.push(d);notes.push(`Identifier matches: ${new Set(ms.map(m=>m.investigation_id)).size} investigations`)}
   }catch(e){notes.push("Identifier matching failed: "+(e instanceof Error?e.message:"error"))}
+  // Companies the brand's own pages name go into the profile too. A name that only appears in a copyright line is a lead, not a seller of record.
+  const siteCos=drafts.flatMap(d=>d.nodes).filter(n=>n.type==="company"&&/named on site$/.test(n.subtitle));
+  if(siteCos.length){
+   const known=new Set((profile.entities||[]).map(e=>e.name.toLowerCase()));
+   profile.entities=[...(profile.entities||[]),...siteCos.filter(n=>!known.has(n.label.toLowerCase())).map(n=>{
+    const roles=(/as: (.*)$/.exec(n.details[0]||"")?.[1]||"").toLowerCase();
+    const seller=/seller|operat|owned|merchant|provider|company|d\/b\/a|dba|terms/.test(roles);
+    return {name:n.label,role:"legal seller",confidence:(seller&&n.subtitle.startsWith("Legal")?"strong":"lead") as any,source:null,status:seller?undefined:"named only in a copyright or brand line on the site; not verified in a registry"};
+   })];
+  }
   let merged:Case={...c,profile};
   for(const d of drafts)merged=mergeDraft(merged,d,seedNode.id);
   let aiError="";

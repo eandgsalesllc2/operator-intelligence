@@ -12,6 +12,7 @@ export const CATEGORIES=[
  "Supplements · Lymphatic, detox & cleanse",
  "Supplements · Joint, pain & mobility",
  "Supplements · Longevity & cellular health",
+ "Supplements · Peptides & research compounds",
  "Supplements · Kids' nutrition",
  "Supplements · Retailer / multi-brand store",
  "Botanicals · Hemp, CBD & THC",
