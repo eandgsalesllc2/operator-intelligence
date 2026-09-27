@@ -67,9 +67,9 @@ export function identifierRows(p?:Profile|null,m?:Marketing|null,ownDomain?:stri
  p.people?.forEach(x=>add("person",x.name));
  p.trademarks?.forEach(t=>{add("trademark_serial",t.serial);add("attorney",t.attorney)});
  p.addresses?.forEach(a=>{if(!a.massAddress&&a.kind!=="registered_agent")add("address",a.address)});
- // Off-site funnel hosts (presell/advertorial domains) that ads send traffic to; marketplaces and social hosts are shared by everyone.
+ // Off-site funnel hosts (presell/advertorial domains) that ads send traffic to; retailers, social platforms and landing-page vendors are shared by everyone.
  const own=(ownDomain||"").replace(/^www\./,"").split(".").slice(-2).join(".");
- m?.landing?.landingPages?.forEach(l=>{const h=(l.host||"").toLowerCase().replace(/^www\./,"");if(!h||(own&&h.endsWith(own))||/amazon\.|walmart\.|target\.com|tiktok\.|facebook\.|instagram\.|fb\.me|linktr\.ee|myshopify\.com$|apple\.com|google\./.test(h))return;add("funnel_host",h)});
+ m?.landing?.landingPages?.forEach(l=>{const h=(l.host||"").toLowerCase().replace(/^www\./,"");if(!h||(own&&h.endsWith(own))||l.kind==="marketplace"||/amazon\.|amzn\.|walmart\.|target\.com|costco\.|samsclub\.|sephora\.|ulta\.|cvs\.|walgreens\.|tiktok\.|facebook\.|(^|\.)fb\.(com|me)$|instagram\.|linktr\.ee|myshopify\.com$|apple\.com|google\.|gotoaisle\.com$|click2cart\.|wayvia\.|mikmak\.|ampd\.to$|substack\.com$/.test(h))return;add("funnel_host",h)});
  return out;
 }
 
