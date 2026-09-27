@@ -46,7 +46,7 @@ export const normalizeIdentifier=(kind:string,v:string)=>norm(kind,v);
 const IGNORE=new Set(["1220658","shopify","gmail.com"]);
 
 // App/vendor names ("Triple Whale", "Recharge") are shared by unrelated stores; only real account IDs or script hosts link brands.
-const isTrackingId=(v:string)=>/\d/.test(v)&&!/\s/.test(v.trim())||/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(v.trim().split(" ")[0])&&!/\s/.test(v.trim());
+const isTrackingId=(v:string)=>/\d/.test(v)&&!/\s/.test(v.trim());
 
 export function identifierRows(p?:Profile|null):IdentifierRow[]{
  if(!p)return [];
