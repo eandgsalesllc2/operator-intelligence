@@ -20,7 +20,7 @@ export type Profile={
 };
 
 export type Marketing={
- asOf?:string;source?:string;sourceUrl?:string;
+ asOf?:string;source?:string;sourceUrl?:string;dataWarning?:string|null;
  meta?:{totalAds?:number;activeAds?:number;mediaMix?:Record<string,number>;activeMediaMix?:Record<string,number>;funnelMix?:Record<string,number>;ctaMix?:Record<string,number>;topCountries?:string[];euSpend?:number|null;euReach?:number|null;
   pages?:{name:string;likes?:number|null;ads?:number;activeAds?:number;euSpend?:number;persona?:boolean;created?:string|null}[];personaPageCount?:number;
   topAds?:{hook:string;headline?:string|null;angle?:string;format?:string;cta?:string|null;euReach?:number|null;landing?:string|null;funnel?:string|null}[]}|null;

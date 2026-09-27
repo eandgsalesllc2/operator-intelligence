@@ -18,6 +18,7 @@ export default function MarketingPanel({c}:{c:Case}){
  if(!m)return <div className="panel"><div className="emptyPanel">No marketing data yet for this investigation.</div></div>;
  const s=m.strategy||{};const meta=m.meta;
  return <div className="profile">
+  {m.dataWarning&&<div className="notice"><Flag size={15}/><span><b>Check this data:</b> {m.dataWarning}</span></div>}
   <div className="pcards">
    <section className="pcard wide"><h4><Target size={14}/> Acquisition strategy {s.scale&&<span className={"chipTag "+(SCALE_TONE[s.scale]||"")}>{s.scale} ad scale</span>}</h4><p className="lead2">{s.summary||"No summary."}</p>
     <div className="kv"><span>Channels</span><Chips items={s.channels}/></div>
