@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-import {Search,Network,ShieldCheck,FileText,Clock3,Plus,ChevronRight,Building2,UserRound,Globe2,Tags,MapPin,X,Menu,Mail,Phone,Loader2,AlertTriangle,CheckCircle2,Sparkles} from "lucide-react";
+import {Search,Network,ShieldCheck,FileText,Clock3,Plus,ChevronRight,ChevronDown,Building2,UserRound,Globe2,Tags,MapPin,X,Menu,Mail,Phone,Loader2,AlertTriangle,CheckCircle2,Sparkles} from "lucide-react";
 import {cases} from "@/lib/data"; import {Case,Confidence,Edge,IntelNode,NodeType} from "@/lib/types";
 import {addEvidence,createInvestigation,loadCases,pivotNode,saveCases} from "@/lib/store";
 import {CATEGORIES,UNCATEGORIZED,labelOf,verticalOf} from "@/lib/categories";
@@ -36,7 +36,7 @@ function Graph({nodes,edges,onPick}:{nodes:IntelNode[],edges:Edge[],onPick:(n:In
 
 export default function Dashboard(){
  const [allCases,setAllCases]=useState<Case[]>(cases),[caseId,setCaseId]=useState("ultimapeak"),[tab,setTab]=useState("graph"),[pick,setPick]=useState<IntelNode|null>(null);
- const [q,setQ]=useState(""),[sq,setSq]=useState(""),[cat,setCat]=useState("all"),[navOpen,setNavOpen]=useState(false);
+ const [q,setQ]=useState(""),[sq,setSq]=useState(""),[cat,setCat]=useState("all"),[navOpen,setNavOpen]=useState(false),[openGroups,setOpenGroups]=useState<Set<string>>(new Set());
  const [newOpen,setNewOpen]=useState(false),[newSeed,setNewSeed]=useState({value:"",type:"auto",name:""}),[pivotOpen,setPivotOpen]=useState(false),[evidenceOpen,setEvidenceOpen]=useState(false);
  const [db,setDb]=useState(false),[webResearch,setWebResearch]=useState<boolean|null>(null),[loading,setLoading]=useState(true);
  const [jobs,setJobs]=useState<Record<string,Job>>({}),[notice,setNotice]=useState("");
@@ -55,6 +55,12 @@ export default function Dashboard(){
  const catCounts=useMemo(()=>{const m=new Map<string,number>();for(const x of allCases){const k=x.category||UNCATEGORIZED;m.set(k,(m.get(k)||0)+1)}return m},[allCases]);
  const verticals=useMemo(()=>{const m=new Map<string,string[]>();for(const k of catCounts.keys()){const v=verticalOf(k);if(!m.has(v))m.set(v,[]);m.get(v)!.push(k)}return [...m.entries()].sort((a,b)=>a[0]===UNCATEGORIZED?1:b[0]===UNCATEGORIZED?-1:a[0].localeCompare(b[0])).map(([v,ks])=>({v,ks:ks.sort(),n:ks.reduce((s,k)=>s+(catCounts.get(k)||0),0)}))},[catCounts]);
  const sideCases=useMemo(()=>{const t=sq.trim().toLowerCase();return allCases.filter(x=>{const k=x.category||UNCATEGORIZED;if(cat!=="all"&&!(cat.startsWith("v:")?verticalOf(k)===cat.slice(2):k===cat))return false;return !t||(x.name+" "+x.domain+" "+k).toLowerCase().includes(t)})},[sq,cat,allCases]);
+ // Sidebar tree: vertical → category → investigations.
+ const tree=useMemo(()=>{
+  const vs=new Map<string,Map<string,Case[]>>();
+  for(const x of sideCases){const k=x.category||UNCATEGORIZED;const v=verticalOf(k);if(!vs.has(v))vs.set(v,new Map());const m=vs.get(v)!;if(!m.has(k))m.set(k,[]);m.get(k)!.push(x)}
+  return [...vs.entries()].sort((a,b)=>a[0]===UNCATEGORIZED?1:b[0]===UNCATEGORIZED?-1:a[0].localeCompare(b[0])).map(([v,m])=>({v,n:[...m.values()].reduce((s,l)=>s+l.length,0),cats:[...m.entries()].sort((a,b)=>labelOf(a[0]).localeCompare(labelOf(b[0]))).map(([k,l])=>({k,items:[...l].sort((a,b)=>a.name.localeCompare(b.name))}))}));
+ },[sideCases]);
  const matches=useMemo(()=>{
   const t=q.trim().toLowerCase();if(t.length<2)return [];
   const out:{c:Case;why:string}[]=[];
@@ -68,6 +74,8 @@ export default function Dashboard(){
   return out.slice(0,30);
  },[q,allCases]);
 
+ useEffect(()=>{const x=allCases.find(y=>y.id===caseId);if(!x)return;const k=x.category||UNCATEGORIZED;setOpenGroups(p=>p.has("v:"+verticalOf(k))&&p.has("c:"+k)?p:new Set([...p,"v:"+verticalOf(k),"c:"+k]))},[caseId,allCases]);
+ const toggleGroup=(key:string)=>setOpenGroups(p=>{const n=new Set(p);n.has(key)?n.delete(key):n.add(key);return n});
  const refreshCase=useCallback(async(id:string)=>{
   const r=await fetch("/api/investigations?id="+encodeURIComponent(id),{cache:"no-store"});const d=await r.json();
   if(d.case)setAllCases(prev=>prev.some(x=>x.id===id)?prev.map(x=>x.id===id?d.case:x):[d.case,...prev]);
@@ -117,10 +125,12 @@ export default function Dashboard(){
  const guessed=newSeed.value.trim()?guessType(newSeed.value):null;
  const pickEdges=pick?c.edges.filter(e=>e.from===pick.id||e.to===pick.id):[];
 
+ const renderCase=(x:Case)=>{const j=jobs[x.id];const running=j&&(j.status==="queued"||j.status==="running");return <button key={x.id} className={"case "+(x.id===caseId?"active":"")} onClick={()=>{setCaseId(x.id);setPick(null);setNavOpen(false)}}><span className="caseIcon">{running?<Loader2 size={14} className="spin"/>:x.name[0]?.toUpperCase()}</span><span><b>{x.name}</b><small>{x.domain||(x.nodes.find(n=>n.id===x.id+":seed")||x.nodes[0])?.type}</small></span><span className="caseActions"><span role="button" aria-label={`Delete ${x.name}`} onClick={e=>{e.stopPropagation();deleteCase(x.id,x.name)}} title="Delete investigation"><X size={13}/></span><ChevronRight size={14}/></span></button>};
  return <main>{navOpen&&<div className="navBackdrop" onClick={()=>setNavOpen(false)}/>}<aside className={navOpen?"open":""}><div className="logo"><div className="mark"><Network size={18}/></div><div>OPERATOR <b>INTELLIGENCE</b></div></div>
  <button className="new" onClick={()=>openNew()}><Plus size={16}/> New investigation</button>
  <div className="sideLabel">INVESTIGATIONS · {cat==="all"?allCases.length:`${sideCases.length} of ${allCases.length}`}</div><select className="catFilter" value={cat} onChange={e=>setCat(e.target.value)} aria-label="Filter by category"><option value="all">All categories</option>{verticals.map(g=><optgroup key={g.v} label={`${g.v} (${g.n})`}>{g.v!==UNCATEGORIZED&&g.ks.length>1&&<option value={"v:"+g.v}>All {g.v} ({g.n})</option>}{g.ks.map(k=><option key={k} value={k}>{labelOf(k)} ({catCounts.get(k)})</option>)}</optgroup>)}</select><div className="sideFilter"><Search size={13}/><input value={sq} onChange={e=>setSq(e.target.value)} placeholder="Filter investigations" aria-label="Filter investigations"/></div>
- <div className="caseList">{sideCases.map(x=>{const j=jobs[x.id];const running=j&&(j.status==="queued"||j.status==="running");return <button key={x.id} className={"case "+(x.id===caseId?"active":"")} onClick={()=>{setCaseId(x.id);setPick(null);setNavOpen(false)}}><span className="caseIcon">{running?<Loader2 size={14} className="spin"/>:x.name[0]?.toUpperCase()}</span><span><b>{x.name}</b><small>{x.category?labelOf(x.category):x.domain||(x.nodes.find(n=>n.id===x.id+":seed")||x.nodes[0])?.type}</small></span><span className="caseActions"><span role="button" aria-label={`Delete ${x.name}`} onClick={e=>{e.stopPropagation();deleteCase(x.id,x.name)}} title="Delete investigation"><X size={13}/></span><ChevronRight size={14}/></span></button>})}{!sideCases.length&&<p className="sideEmpty">{loading?"Loading investigations…":`No investigations match "${sq}".`}</p>}</div>
+ <div className="caseList">{tree.map(g=>{const vOpen=Boolean(sq.trim())||cat!=="all"||openGroups.has("v:"+g.v);return <div key={g.v} className="grp"><button className="grpHead" aria-expanded={vOpen} onClick={()=>toggleGroup("v:"+g.v)}>{vOpen?<ChevronDown size={14}/>:<ChevronRight size={14}/>}<span>{g.v}</span><em>{g.n}</em></button>
+  {vOpen&&g.cats.map(ct=>{const cOpen=Boolean(sq.trim())||cat===ct.k||openGroups.has("c:"+ct.k);return <div key={ct.k} className="sub"><button className="subHead" aria-expanded={cOpen} onClick={()=>toggleGroup("c:"+ct.k)}>{cOpen?<ChevronDown size={12}/>:<ChevronRight size={12}/>}<span>{labelOf(ct.k)}</span><em>{ct.items.length}</em></button>{cOpen&&ct.items.map(renderCase)}</div>})}</div>})}{!sideCases.length&&<p className="sideEmpty">{loading?"Loading investigations…":`No investigations match "${sq}".`}</p>}</div>
  <div className="sideLabel bottom">SYSTEM</div><div className="mini"><ShieldCheck size={15}/> Evidence standard: strict</div><div className="mini"><Sparkles size={15}/> Web research: {webResearch===null?"checking…":webResearch?"on":"off"}</div>
  </aside><section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><div className="search"><Search size={17}/><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&q.trim()&&!matches.length)openNew(q.trim())}} placeholder="Search or research a brand, person, company, domain, email…" aria-label="Search investigations"/></div><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
  {q.trim().length>=2&&<div className="results">

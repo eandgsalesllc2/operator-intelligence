@@ -64,3 +64,10 @@ header{gap:12px}
 .catFilter{margin:0 2px 8px;border:1px solid #1f2b36;border-radius:7px;background:#0d141b;color:#b8c5d1;font:inherit;font-size:12px;padding:7px 8px;outline:none}.catFilter:focus-visible{border-color:#3b8ee4}
 .crumbCat{border:0;background:transparent;color:#8fa7bf;font:inherit;letter-spacing:inherit;padding:0;cursor:pointer}.crumbCat:hover{color:#dce5ee;text-decoration:underline}
 .catRow{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12px;color:#6f8092}.catRow select{border:1px solid #26333f;border-radius:7px;background:#0d141b;color:#dce5ee;font:inherit;font-size:12px;padding:6px 8px;max-width:100%}
+
+.grp{margin-bottom:2px}.grpHead,.subHead{display:flex;align-items:center;gap:6px;width:100%;border:0;background:transparent;color:#9fb0c0;cursor:pointer;text-align:left;border-radius:6px}
+.grpHead{padding:8px 6px;font-size:11px;font-weight:650;letter-spacing:.9px;text-transform:uppercase;color:#b8c7d6}.grpHead:hover,.subHead:hover{background:#0f1922}
+.subHead{padding:6px 6px 6px 18px;font-size:12px;color:#8494a3}.grpHead span,.subHead span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.grpHead em,.subHead em{font-style:normal;font-size:10px;color:#5f6d7b;background:#111c27;border-radius:10px;padding:1px 7px}
+.sub .case{padding-left:22px}
+.grpHead:focus-visible,.subHead:focus-visible{outline:2px solid #3b8ee4;outline-offset:-2px}
