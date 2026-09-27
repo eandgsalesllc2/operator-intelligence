@@ -1,6 +1,7 @@
 // Brand traffic and a transparent revenue forecast.
 // Visits, ad counts and bestseller prices come from BrandSearch; revenue is a model, not a reported figure:
 //   AOV = median price of the top-5 bestsellers by rank, ignoring items under $5
+//   conversion is halved when AOV > $150 (high-ticket items)
 //   low  = visits × 1.0% × AOV
 //   mid  = visits × 2.0% × AOV × 1.3   (bundles / upsells)
 //   high = visits × 3.0% × AOV × 1.6
@@ -18,13 +19,14 @@ export type Metrics={
  asOf?:string;
  method?:string;
 };
-export const REVENUE_METHOD="Forecast, not reported revenue: monthly visits × conversion (1% / 2% / 3%) × average order value (median price of the top-5 bestsellers by rank, ignoring items under $5; ×1 / ×1.3 / ×1.6 for bundles and upsells).";
+export const REVENUE_METHOD="Forecast, not reported revenue: monthly visits × conversion (1% / 2% / 3%, halved when the order value is over $150) × average order value (median price of the top-5 bestsellers by rank, ignoring items under $5; ×1 / ×1.3 / ×1.6 for bundles and upsells).";
 
 export function forecast(visits:number|null|undefined,prices:number[]):{aov:number|null;revenue:Metrics["revenue"]}{
  const p=prices.filter(x=>x>=5).slice(0,5);
  if(!visits||!p.length)return {aov:p.length?median(p):null,revenue:null};
  const aov=median(p);
- return {aov,revenue:{low:Math.round(visits*0.01*aov),mid:Math.round(visits*0.02*aov*1.3),high:Math.round(visits*0.03*aov*1.6)}};
+ const k=aov>150?0.5:1; // high-ticket items convert at about half the rate
+ return {aov,revenue:{low:Math.round(visits*0.01*k*aov),mid:Math.round(visits*0.02*k*aov*1.3),high:Math.round(visits*0.03*k*aov*1.6)}};
 }
 const median=(xs:number[])=>{const s=[...xs].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2};
 
