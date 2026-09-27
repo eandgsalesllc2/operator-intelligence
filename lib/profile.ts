@@ -77,7 +77,7 @@ export function identifierRows(p?:Profile|null,m?:Marketing|null,ownDomain?:stri
 
 export const KIND_LABEL:Record<string,string>={shopify_store:"Shopify store",shopify_shop_id:"Shopify shop ID",google_analytics:"Google Analytics",gtm:"Tag Manager",google_ads:"Google Ads",meta_pixel:"Meta pixel",tiktok_pixel:"TikTok pixel",clarity:"Clarity",klaviyo:"Klaviyo",tracking:"Tracking ID",checkout_account:"Checkout account",payment_id:"Payment ID",amazon_seller:"Amazon seller",card_descriptor:"Card descriptor",email:"Email",phone:"Phone",domain:"Domain",company:"Company",person:"Person",trademark_serial:"Trademark serial",attorney:"Trademark attorney",address:"Address",funnel_host:"Funnel host",ad_page:"Ad page"};
 // Kinds that are strong operator signals when shared, vs. ones that only show a common service provider.
-export const STRONG_KINDS=new Set(["shopify_store","shopify_shop_id","google_analytics","gtm","google_ads","meta_pixel","tiktok_pixel","clarity","klaviyo","checkout_account","payment_id","amazon_seller","card_descriptor","email","phone","company","person","trademark_serial","domain","address","funnel_host","ad_page"]);
+export const STRONG_KINDS=new Set(["shopify_store","shopify_shop_id","google_analytics","gtm","google_ads","meta_pixel","tiktok_pixel","clarity","klaviyo","checkout_account","payment_id","amazon_seller","card_descriptor","email","phone","company","person","trademark_serial","domain","address","funnel_host"]);
 
 // Compact labels stored on the investigation for filtering in the sidebar.
 export function tagsFor(p?:Profile|null,m?:Marketing|null,network?:string|null):string[]{
