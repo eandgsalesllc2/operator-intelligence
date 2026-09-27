@@ -34,3 +34,5 @@ export function compact(n:number|null|undefined,prefix=""){
  const [v,s]=a>=1e9?[n/1e9,"B"]:a>=1e6?[n/1e6,"M"]:a>=1e3?[n/1e3,"K"]:[n,""];
  return prefix+(Math.abs(v)>=100||s===""?Math.round(v).toString():v.toFixed(1).replace(/\.0$/,""))+s;
 }
+
+export const currencySymbol=(c?:string)=>({USD:"$",EUR:"€",GBP:"£",CAD:"CA$",AUD:"A$"} as Record<string,string>)[c||"USD"]||((c||"")+" ");
