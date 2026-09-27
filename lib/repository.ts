@@ -14,7 +14,10 @@ export type PortfolioMatch={investigation:{id:string;name:string;domain:string};
 // Find entities in other investigations whose label contains the term (people, companies, domains, emails, phones...).
 export async function searchPortfolio(term:string,excludeInvestigationId?:string):Promise<PortfolioMatch[]>{
  if(!hasDb())return [];const t=term.trim().replace(/[*,()"]/g," ").replace(/\s+/g," ").trim();if(t.length<4)return [];
- const ents:any[]=await request(`entities?label=ilike.${encodeURIComponent("*"+t+"*")}&select=id,label,type,confidence,investigation_id&limit=60`);
+ // Every word must appear, in any order, so "Johnathan Sack" also finds "Johnathan P. Sack".
+ const words=t.includes("@")||t.includes(".")&&!t.includes(" ")?[t]:t.split(" ").filter(w=>w.length>=2).slice(0,5);
+ const filter=words.map(w=>`label=ilike.${encodeURIComponent("*"+w+"*")}`).join("&");
+ const ents:any[]=await request(`entities?${filter}&select=id,label,type,confidence,investigation_id&limit=60`);
  const hits=ents.filter(e=>e.investigation_id!==excludeInvestigationId);if(!hits.length)return [];
  const invIds=[...new Set(hits.map(e=>e.investigation_id))];const entIds=hits.map(e=>e.id);
  const list=(xs:string[])=>xs.map(x=>'"'+x.replace(/"/g,'')+'"').join(",");
