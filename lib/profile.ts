@@ -37,13 +37,16 @@ const norm=(kind:string,v:string)=>{
  let s=String(v).trim().toLowerCase();
  if(kind==="phone"){const d=s.replace(/\D/g,"");return d.length>=10?d.slice(-10):d}
  if(kind==="domain")s=s.replace(/^[a-z]+:\/\//,"").replace(/^www\./,"").split(/[/?#]/)[0];
- if(kind==="company"||kind==="person"||kind==="attorney")s=s.replace(/[.,]/g,"").replace(/\s+/g," ").replace(/\b(llc|inc|incorporated|corp|corporation|ltd|limited|co|pbc|llp|pllc)\b/g,"").trim();
+ if(kind==="company"||kind==="person"||kind==="attorney")s=s.replace(/[.,]/g,"").replace(/\s+/g," ").replace(/\b(llc|inc|incorporated|corp|corporation|ltd|limited|co|pbc|llp|pllc|plc|sa|ag|gmbh|bv)\b/g,"").trim();
  return s;
 };
 export const normalizeIdentifier=(kind:string,v:string)=>norm(kind,v);
 
 // Service providers and vendor constants that appear across unrelated stores; never treat as links.
 const IGNORE=new Set(["1220658","shopify","gmail.com"]);
+
+// App/vendor names ("Triple Whale", "Recharge") are shared by unrelated stores; only real account IDs or script hosts link brands.
+const isTrackingId=(v:string)=>/\d/.test(v)&&!/\s/.test(v.trim())||/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(v.trim().split(" ")[0])&&!/\s/.test(v.trim());
 
 export function identifierRows(p?:Profile|null):IdentifierRow[]{
  if(!p)return [];
@@ -52,10 +55,10 @@ export function identifierRows(p?:Profile|null):IdentifierRow[]{
  const id=p.identifiers||{};
  add("shopify_store",id.shopifyStore);add("shopify_shop_id",id.shopifyShopId);
  id.googleAnalytics?.forEach(v=>add("google_analytics",v));id.googleTagManager?.forEach(v=>add("gtm",v));id.googleAds?.forEach(v=>add("google_ads",v));
- id.metaPixel?.forEach(v=>add("meta_pixel",v));id.tiktokPixel?.forEach(v=>add("tiktok_pixel",v));id.clarity?.forEach(v=>add("clarity",v));id.klaviyo?.forEach(v=>add("klaviyo",v));id.otherTracking?.forEach(v=>add("tracking",v));
+ id.metaPixel?.forEach(v=>add("meta_pixel",v));id.tiktokPixel?.forEach(v=>add("tiktok_pixel",v));id.clarity?.forEach(v=>add("clarity",v));id.klaviyo?.forEach(v=>add("klaviyo",v));id.otherTracking?.forEach(v=>{if(isTrackingId(v))add("tracking",v)});
  add("checkout_account",id.checkoutAccount);id.paymentIds?.forEach(v=>add("payment_id",v));id.amazonSellers?.forEach(v=>add("amazon_seller",v));id.cardDescriptors?.forEach(v=>add("card_descriptor",v));
  id.supportEmails?.forEach(v=>add("email",v));id.phones?.forEach(v=>add("phone",v));id.relatedDomains?.forEach(d=>add("domain",d.domain));
- p.entities?.forEach(e=>{add("company",e.name);e.officers?.forEach(o=>add("person",o.name))});
+ p.entities?.forEach(e=>{if(!/^other$|vendor|provider|processor|registered agent/i.test(e.role||""))add("company",e.name);e.officers?.forEach(o=>add("person",o.name))});
  p.people?.forEach(x=>add("person",x.name));
  p.trademarks?.forEach(t=>{add("trademark_serial",t.serial);add("attorney",t.attorney)});
  p.addresses?.forEach(a=>{if(!a.massAddress&&a.kind!=="registered_agent")add("address",a.address)});
