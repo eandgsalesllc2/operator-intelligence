@@ -38,34 +38,39 @@ const CaseSchema=z.object({
  evidence:z.array(z.object({title:z.string(),url:z.string(),confidence:z.enum(CONF),note:z.string().describe("Exactly what the source supports")})),
  timeline:z.array(z.object({date:z.string().describe("YYYY-MM-DD, YYYY-MM or YYYY"),title:z.string(),body:z.string()})),
  open_questions:z.array(z.string()),
- store_domain:z.string().nullable().describe("The brand's actual storefront domain (e.g. rhodeskin.com) when it differs from the seed domain; null if the seed is the store or unknown"),
- profile:z.object({
-  ownership_status:z.enum(["identified","legal_entity_only","operator_unknown","contested"]).describe("identified = beneficial owner/parent documented; legal_entity_only = only a legal seller/IP owner is known; operator_unknown = no entity found; contested = sources conflict"),
-  ownership_note:z.string().describe("One or two sentences: who owns, who operates, and what is not yet proven"),
-  network:z.string().nullable().describe("Parent company or operator group, if documented"),
-  entities:z.array(z.object({name:z.string(),role:z.enum(["legal seller","ip owner","parent","operator","manager","predecessor","other"]),jurisdiction:z.string().nullable(),file_number:z.string().nullable(),formed:z.string().nullable(),status:z.string().nullable(),registered_agent:z.string().nullable(),confidence:z.enum(CONF),source:z.string().nullable()})).describe("Companies in business roles; use 'other' for service providers and registered agents"),
-  trademarks:z.array(z.object({mark:z.string(),serial:z.string().nullable(),registration:z.string().nullable(),owner:z.string().nullable(),status:z.string().nullable(),filed:z.string().nullable(),attorney:z.string().nullable()})),
-  people:z.array(z.object({name:z.string(),role:z.string(),confidence:z.enum(CONF)})).describe("People in business roles only (founder, officer, manager, filer)"),
-  bbb_rating:z.string().nullable(),bbb_complaints:z.number().nullable(),
-  lawsuits:z.array(z.object({title:z.string(),court:z.string().nullable(),case_no:z.string().nullable(),date:z.string().nullable(),status:z.string().nullable()})),
-  regulatory:z.array(z.object({agency:z.string(),action:z.string(),date:z.string().nullable()})),
-  risks:z.array(z.string()).describe("Short risk flags, e.g. 'persona/doctor ad pages', 'clone storefront', 'dissolved entity still selling'"),
-  support_emails:z.array(z.string()).describe("Business support emails on the brand's own domain"),
-  business_phones:z.array(z.string()),
-  needs_deep_dive:z.boolean(),deep_dive_reason:z.string().nullable(),
- }),
+});
+
+// Kept separate from CaseSchema: one combined schema exceeds the API's structured-output grammar limit.
+// Unknown text fields are "" rather than null to keep the grammar small.
+const ProfileSchema=z.object({
+ store_domain:z.string().describe("The brand's actual storefront domain (e.g. rhodeskin.com) when it differs from the seed domain; \"\" if the seed is the store or unknown"),
+ ownership_status:z.enum(["identified","legal_entity_only","operator_unknown","contested"]).describe("identified = beneficial owner/parent documented; legal_entity_only = only a legal seller/IP owner is known; operator_unknown = no entity found; contested = sources conflict"),
+ ownership_note:z.string().describe("One or two sentences: who owns, who operates, and what is not yet proven"),
+ network:z.string().describe("Parent company or operator group if documented, else \"\""),
+ entities:z.array(z.object({name:z.string(),role:z.enum(["legal seller","ip owner","parent","operator","manager","predecessor","other"]),jurisdiction:z.string(),formed:z.string(),status:z.string(),confidence:z.enum(CONF),source:z.string()})).describe("Companies in business roles; 'other' for service providers and registered agents"),
+ trademarks:z.array(z.object({mark:z.string(),serial:z.string(),owner:z.string(),status:z.string(),attorney:z.string()})),
+ people:z.array(z.object({name:z.string(),role:z.string(),confidence:z.enum(CONF)})).describe("People in business roles only"),
+ bbb:z.string().describe("BBB rating and complaint count if found, e.g. 'F · 42 complaints', else \"\""),
+ lawsuits:z.array(z.object({title:z.string(),court:z.string(),case_no:z.string(),date:z.string()})),
+ regulatory:z.array(z.object({agency:z.string(),action:z.string(),date:z.string()})),
+ risks:z.array(z.string()).describe("Short risk flags, e.g. 'persona/doctor ad pages', 'research-use-only peptides sold for human use', 'dissolved entity still selling'"),
+ support_emails:z.array(z.string()).describe("Business support emails on the brand's own domain"),
+ business_phones:z.array(z.string()),
+ needs_deep_dive:z.boolean(),deep_dive_reason:z.string(),
 });
 
 // Structured profile from the model's output, in the app's Profile shape.
-function toProfile(p:z.infer<typeof CaseSchema>["profile"]):import("./profile").Profile{
+function toProfile(p:z.infer<typeof ProfileSchema>):import("./profile").Profile{
+ const v=(x:string)=>x.trim()||null;
+ const bbb=/^([A-F][+-]?)/i.exec(p.bbb.trim())?.[1]?.toUpperCase()||null;const complaints=/(\d[\d,]*)\s*complaint/i.exec(p.bbb)?.[1];
  return {
   identifiers:{supportEmails:p.support_emails,phones:p.business_phones},
-  entities:p.entities.map(e=>({name:e.name,role:e.role,jurisdiction:e.jurisdiction,fileNumber:e.file_number,formed:e.formed,status:e.status||undefined,registeredAgent:e.registered_agent,confidence:e.confidence,source:e.source})),
-  trademarks:p.trademarks.map(t=>({mark:t.mark,serial:t.serial,registration:t.registration,owner:t.owner,status:t.status||undefined,filed:t.filed,attorney:t.attorney})),
+  entities:p.entities.map(e=>({name:e.name,role:e.role,jurisdiction:v(e.jurisdiction),formed:v(e.formed),status:v(e.status)||undefined,confidence:e.confidence,source:v(e.source)})),
+  trademarks:p.trademarks.map(t=>({mark:t.mark,serial:v(t.serial),owner:v(t.owner),status:v(t.status)||undefined,attorney:v(t.attorney)})),
   people:p.people,
-  network:p.network?{name:p.network}:undefined,
-  reputation:{bbbRating:p.bbb_rating,bbbComplaints:p.bbb_complaints,lawsuits:p.lawsuits.map(l=>({title:l.title,court:l.court,caseNo:l.case_no,date:l.date,status:l.status})),regulatory:p.regulatory,risks:p.risks},
-  research:{depth:"web",researchedAt:new Date().toISOString().slice(0,10),needsDeepDive:p.needs_deep_dive,deepDiveReason:p.deep_dive_reason,ownershipStatus:p.ownership_status,ownershipNote:p.ownership_note},
+  network:v(p.network)?{name:p.network.trim()}:undefined,
+  reputation:{bbbRating:bbb,bbbComplaints:complaints?+complaints.replace(/,/g,""):null,lawsuits:p.lawsuits.map(l=>({title:l.title,court:v(l.court),caseNo:v(l.case_no),date:v(l.date)})),regulatory:p.regulatory.map(r=>({agency:r.agency,action:r.action,date:v(r.date)})),risks:p.risks},
+  research:{depth:"web",researchedAt:new Date().toISOString().slice(0,10),needsDeepDive:p.needs_deep_dive,deepDiveReason:v(p.deep_dive_reason),ownershipStatus:p.ownership_status,ownershipNote:p.ownership_note},
  };
 }
 
@@ -121,12 +126,21 @@ class ClaudeResearchProvider implements ResearchProvider{
   if(!dossier.trim()&&!sources.size)return {findings:[],draft:emptyDraft(),notes:["Web research returned nothing."]};
   await ctx.log(`Structuring findings from ${sources.size} sources…`);
   const sourceList=[...sources.values()].slice(0,80).map(s=>`- ${s.url} — ${s.title}${s.snippet?` — ${s.snippet.slice(0,200)}`:""}`).join("\n");
-  const parsed=await client.messages.parse({
-   model:MODEL,max_tokens:16000,
-   thinking:{type:"adaptive"},output_config:{effort:"medium",format:zodOutputFormat(CaseSchema)},
-   system:"Convert an OSINT dossier into a case graph. Use only facts in the dossier. Nodes are only brands, people in business roles, companies, trademarks, domains, business addresses, business phones and business emails; put events (recalls, lawsuits, filings, articles) in the timeline and evidence instead, never as nodes. Never add relatives or private individuals, including excluded name collisions of people. The seed entity's node key must be \"seed\". Keep the dossier's confidence labels; never raise them. Every evidence url must be one of the listed sources or a URL quoted in the dossier. Leave out residential addresses and personal contact details. 6–25 nodes. Also fill the structured profile from the same facts (same confidence rules) and set store_domain when the dossier shows the brand sells on a different domain than the seed.",
-   messages:[{role:"user",content:`${seedLine}\n\nDOSSIER:\n${dossier}\n\nSOURCES SEEN:\n${sourceList}`}],
-  });
+  const input=`${seedLine}\n\nDOSSIER:\n${dossier}\n\nSOURCES SEEN:\n${sourceList}`;
+  const [parsed,profiled]=await Promise.all([
+   client.messages.parse({
+    model:MODEL,max_tokens:16000,
+    thinking:{type:"adaptive"},output_config:{effort:"medium",format:zodOutputFormat(CaseSchema)},
+    system:"Convert an OSINT dossier into a case graph. Use only facts in the dossier. Nodes are only brands, people in business roles, companies, trademarks, domains, business addresses, business phones and business emails; put events (recalls, lawsuits, filings, articles) in the timeline and evidence instead, never as nodes. Never add relatives or private individuals, including excluded name collisions of people. The seed entity's node key must be \"seed\". Keep the dossier's confidence labels; never raise them. Every evidence url must be one of the listed sources or a URL quoted in the dossier. Leave out residential addresses and personal contact details. 6–25 nodes.",
+    messages:[{role:"user",content:input}],
+   }),
+   client.messages.parse({
+    model:MODEL,max_tokens:8000,
+    thinking:{type:"adaptive"},output_config:{effort:"low",format:zodOutputFormat(ProfileSchema)},
+    system:"Fill a structured ownership profile from an OSINT dossier. Use only facts in the dossier; use \"\" or empty lists for anything it does not state. Keep the dossier's confidence labels; never raise them. Business roles only: no residential addresses, personal contacts or relatives. Set store_domain when the dossier shows the brand sells on a different domain than the seed.",
+    messages:[{role:"user",content:input}],
+   }).catch(async e=>{await ctx.log("Profile structuring failed; the graph is still saved.");console.error("profile parse failed",e);return null}),
+  ]);
   const out=parsed.parsed_output;
   const draft=emptyDraft();
   if(out){
@@ -141,8 +155,10 @@ class ClaudeResearchProvider implements ResearchProvider{
    draft.questions=out.open_questions.slice(0,6);
    draft.summary=out.summary;
    draft.category=out.category;
-   draft.profile=toProfile(out.profile);
-   draft.storeDomain=out.store_domain;
+  }
+  if(profiled?.parsed_output){
+   draft.profile=toProfile(profiled.parsed_output);
+   draft.storeDomain=profiled.parsed_output.store_domain.trim()||null;
   }
   const findings:ProviderFinding[]=[
    {title:`Research dossier: ${ctx.seedValue}`,url:`claude-research://${encodeURIComponent(ctx.seedValue)}`,publisher:"Claude web research",snippet:dossier.slice(0,20000),sourceType:"ai_research",entities:draft.nodes.map(n=>({type:n.type,label:n.label,subtitle:n.subtitle})),claims:draft.edges.map(e=>({from:e.from,to:e.to,label:e.label,claim:`${e.from} ${e.label} ${e.to} (${e.confidence})`}))},

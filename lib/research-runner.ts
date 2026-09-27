@@ -132,6 +132,7 @@ export async function runResearchJob(job:any){
   }catch(e){notes.push("Identifier matching failed: "+(e instanceof Error?e.message:"error"))}
   let merged:Case={...c,profile};
   for(const d of drafts)merged=mergeDraft(merged,d,seedNode.id);
+  let aiError="";
   if(aiResearchEnabled()){
    await log("Starting web research",45);
    const pre={nodes:drafts.flatMap(d=>d.nodes),evidence:drafts.flatMap(d=>d.evidence)} as Draft;
@@ -154,7 +155,7 @@ export async function runResearchJob(job:any){
      }
      if(!c.domain||cleanDomain(c.domain)===domain){merged={...merged,domain:store};notes.push(`Store domain is ${store}; the investigation now uses it.`)}
     }
-   }catch(e){notes.push(`${claudeResearch.label}: failed — ${e instanceof Error?e.message:"error"}`)}
+   }catch(e){aiError=e instanceof Error?e.message:"error";notes.push(`${claudeResearch.label}: failed — ${aiError}`);console.error("web research failed",e)}
   }
   if(!aiResearchEnabled()||merged.summary===c.summary)merged={...merged,summary:describe(merged,seedNode.id,job.seed_value)};
   const added=merged.nodes.length-c.nodes.length, newEvidence=merged.evidence.length-c.evidence.length;
@@ -167,7 +168,7 @@ export async function runResearchJob(job:any){
   };
   merged.nodes=layout(merged.nodes,seedNode.id);
   await saveInvestigation(merged);
-  const message=empty?"No sources found. "+notes.join(" | "):`Research complete · ${added} new entities · ${newEvidence} new evidence · ${findingsTotal} sources`;
+  const message=empty?"No sources found. "+notes.join(" | "):aiError?`Partial research · web research failed (${aiError.slice(0,160)}) · ${added} new entities from the site and registries`:`Research complete · ${added} new entities · ${newEvidence} new evidence · ${findingsTotal} sources`;
   return await updateResearchJob(job.id,{status:empty?"failed":"completed",provider:"multi",progress:100,message:message.slice(0,1000),error:empty?"Nothing was collected":"",completed_at:new Date().toISOString()});
  }catch(error){
   const message=error instanceof Error?error.message:"Research failed";
