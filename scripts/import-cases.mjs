@@ -72,7 +72,7 @@ if(!api){for(const c of cases)console.log(`  ${c.id.padEnd(26)} ${String(c.nodes
 
 let failed=0;
 for(const c of cases){
-  const r=await fetch(`${api}/api/investigations`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(c)});
+  const r=await fetch(`${api}/api/investigations`,{method:"POST",headers:{"Content-Type":"application/json",...(process.env.OI_API_TOKEN?{Authorization:"Bearer "+process.env.OI_API_TOKEN}:{})},body:JSON.stringify(c)});
   const body=await r.json().catch(()=>({}));
   if(!r.ok||body.error){failed++;console.error(`✗ ${c.id}: ${body.error||r.status}`)}else console.log(`✓ ${c.id}`);
 }

@@ -7,6 +7,8 @@ import {CATEGORIES,UNCATEGORIZED,labelOf,verticalOf} from "@/lib/categories";
 import {MRR_METHOD,REVENUE_METHOD,compact,currencySymbol} from "@/lib/metrics";
 import ProfilePanel from "./ProfilePanel";
 import MarketingPanel from "./MarketingPanel";
+import Onboarding from "./Onboarding";
+import AccountMenu,{type Me} from "./AccountMenu";
 
 const cc:Record<Confidence,string>={confirmed:"#35d07f",strong:"#4aa8ff",correlation:"#f5b942",lead:"#929baa",excluded:"#ff6470"};
 const icons:Record<NodeType,any>={brand:Globe2,person:UserRound,company:Building2,trademark:Tags,domain:Globe2,address:MapPin,phone:Phone,email:Mail};
@@ -44,6 +46,11 @@ export default function Dashboard(){
  const [db,setDb]=useState(false),[webResearch,setWebResearch]=useState<boolean|null>(null),[loading,setLoading]=useState(true);
  const [jobs,setJobs]=useState<Record<string,Job>>({}),[notice,setNotice]=useState("");
  const polls=useRef<Record<string,number>>({});
+ const [me,setMe]=useState<Me|null>(null),[tour,setTour]=useState(false);
+ useEffect(()=>{
+  if(new URLSearchParams(window.location.search).get("tour")==="1")setTour(true);
+  fetch("/api/auth/me").then(r=>{if(r.status===401){window.location.href="/login";return null}return r.ok?r.json():null}).then(d=>{if(d?.user){setMe(d.user);if(!d.user.onboarded_at)setTour(true)}}).catch(()=>{});
+ },[]);
 
  useEffect(()=>{
   const stored=loadCases();setAllCases(stored);
@@ -138,7 +145,8 @@ export default function Dashboard(){
  <div className="caseList">{tree.map(g=>{const vOpen=Boolean(sq.trim())||cat!=="all"||openGroups.has("v:"+g.v);return <div key={g.v} className="grp"><button className="grpHead" aria-expanded={vOpen} onClick={()=>toggleGroup("v:"+g.v)}>{vOpen?<ChevronDown size={14}/>:<ChevronRight size={14}/>}<span>{g.v}</span><em>{g.n}</em></button>
   {vOpen&&g.cats.map(ct=>{const cOpen=Boolean(sq.trim())||cat===ct.k||openGroups.has("c:"+ct.k);return <div key={ct.k} className="sub"><button className="subHead" aria-expanded={cOpen} onClick={()=>toggleGroup("c:"+ct.k)}>{cOpen?<ChevronDown size={12}/>:<ChevronRight size={12}/>}<span>{labelOf(ct.k)}</span><em>{ct.items.length}</em></button>{cOpen&&ct.items.map(renderCase)}</div>})}</div>})}{!sideCases.length&&<p className="sideEmpty">{loading?"Loading investigations…":`No investigations match "${sq}".`}</p>}</div>
  <div className="sideLabel bottom">SYSTEM</div><div className="mini"><ShieldCheck size={15}/> Evidence standard: strict</div><div className="mini"><Sparkles size={15}/> Web research: {webResearch===null?"checking…":webResearch?"on":"off"}</div>
- </aside><section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><div className="search"><Search size={17}/><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&q.trim()&&!matches.length)openNew(q.trim())}} placeholder="Search or research a brand, person, company, domain, email…" aria-label="Search investigations"/></div><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
+ {me&&<AccountMenu me={me} onReplay={()=>{setNavOpen(false);setTour(true)}}/>}
+ </aside>{tour&&<Onboarding name={me?.full_name} onDone={()=>{setTour(false);setMe(m=>m?{...m,onboarded_at:new Date().toISOString()}:m)}}/>}<section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><div className="search"><Search size={17}/><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&q.trim()&&!matches.length)openNew(q.trim())}} placeholder="Search or research a brand, person, company, domain, email…" aria-label="Search investigations"/></div><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
  {q.trim().length>=2&&<div className="results">
   <button className="researchRow" onClick={()=>openNew(q.trim())}><Sparkles size={15}/><span><b>Research “{q.trim()}”</b><small>Start a new investigation · looks like a {TYPES.find(t=>t.value===guessType(q))?.label.toLowerCase()}</small></span></button>
   {matches.map(m=><button key={m.c.id} onClick={()=>{setCaseId(m.c.id);setQ("");setPick(null)}}><b>{m.c.name}</b><span>{m.why}</span></button>)}
