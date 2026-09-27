@@ -1,7 +1,10 @@
 "use client";
 import {Case} from "@/lib/types";
 import {compact} from "@/lib/metrics";
-import {Megaphone,Target,Mail,PlayCircle,Users,Flag,Route} from "lucide-react";
+import {Megaphone,Target,Mail,PlayCircle,Users,Flag,Route,Link2} from "lucide-react";
+
+const KIND_TONE:Record<string,string>={advertorial:"warn",quiz:"warn",offer_lp:"",product:"dim",collection:"dim",home:"dim",marketplace:"",external:"bad",checkout:"dim"};
+const KIND_LABEL:Record<string,string>={advertorial:"advertorial / presell",offer_lp:"offer page",product:"product page",collection:"collection",home:"homepage",quiz:"quiz",checkout:"checkout",marketplace:"marketplace",external:"off-site"};
 
 const SCALE_TONE:Record<string,string>={"very high":"bad","high":"warn","medium":"","low":"dim","minimal":"dim"};
 
@@ -47,6 +50,18 @@ export default function MarketingPanel({c}:{c:Case}){
    <section className="pcard"><h4><PlayCircle size={14}/> Instagram</h4>{m.instagram&&m.instagram.posts?<><p><b>{compact(m.instagram.posts)}</b> posts · <b>{compact(m.instagram.likes)}</b> likes</p><p className="dim small">{compact(m.instagram.comments)} comments · best post {compact(m.instagram.maxLikes)} likes</p></>:<p className="dim">No Instagram activity tracked.</p>}</section>
    <section className="pcard"><h4><Mail size={14}/> Email</h4>{m.email&&m.email.total?<><p><b>{m.email.total}</b> emails captured · {m.email.marketing||0} marketing · {m.email.abandonedCart||0} abandoned-cart</p><p className="dim small">{m.email.firstSent?.slice(0,10)} → {m.email.lastSent?.slice(0,10)}</p>{(m.email.recentSubjects||[]).length>0&&<ul className="subjects">{m.email.recentSubjects!.map((x,i)=><li key={i}>{x}</li>)}</ul>}</>:<p className="dim">No emails captured.</p>}</section>
   </div>
+
+  {m.landing&&<section className="psec"><h4><Link2 size={14}/> Running landing pages</h4>
+   {m.landing.notes&&<p className="lead2">{m.landing.notes}</p>}
+   <div className="mgrid">
+    <div><h5>Ads by page type (Atria)</h5><Bars data={Object.fromEntries(Object.entries(m.landing.kindMix||{}).map(([k,v])=>[KIND_LABEL[k]||k,v]))}/></div>
+    <div><h5>Funnel type (BrandSearch)</h5><Bars data={m.landing.brandsearchFunnelMix||undefined}/></div>
+    <div><h5>Hosts</h5><Chips items={(m.landing.hosts||[]).slice(0,8).map(h=>`${h.host} · ${h.activeAds}`)}/></div>
+   </div>
+   {(m.landing.landingPages||[]).length>0?<div className="tableWrap"><table className="ptable"><thead><tr><th>Landing page</th><th>Type</th><th>Ads</th><th>Best rank</th><th>Days live</th><th>Run by</th></tr></thead><tbody>{m.landing.landingPages!.map((l,i)=><tr key={i}><td className="lpcell"><a href={l.url} target="_blank" rel="noopener noreferrer nofollow" className="mono small">{(l.host||"")+(l.path||"")}</a>{l.headline&&<div className="dim small">“{l.headline}”</div>}</td><td><span className={"chipTag "+(KIND_TONE[l.kind||""]||"")}>{KIND_LABEL[l.kind||""]||l.kind||"—"}</span>{l.status==="inactive"&&<span className="chipTag dim">ended</span>}</td><td>{l.activeAds??"—"}</td><td>{l.bestRank??"—"}</td><td>{l.maxDaysRunning??"—"}</td><td className="small">{(l.pages||[]).slice(0,3).join(", ")}{(l.pages||[]).length>3?` +${l.pages!.length-3}`:""}</td></tr>)}</tbody></table></div>:<p className="dim">No running ads with landing pages found in Atria.</p>}
+   {(m.landing.advertisers||[]).filter(a=>a.role!=="main").length>0&&<p className="dim small">Other pages whose ads link to this site: {m.landing.advertisers!.filter(a=>a.role!=="main").slice(0,10).map(a=>`${a.name} (${a.totalAds??"?"} ads)`).join(", ")}</p>}
+   <p className="dim small">{m.landing.sampledActiveAds!=null?`Sampled ${m.landing.sampledActiveAds} of ${m.landing.totalActiveAds??"?"} active ads by impressions. `:""}Source: Atria ad library{m.landing.brandsearchFunnelMix?" + BrandSearch":""}{m.landing.asOf?` · ${m.landing.asOf}`:""}.</p>
+  </section>}
 
   {m.funnel&&<section className="psec"><h4><Route size={14}/> Funnel</h4>
    <div className="kv"><span>Landing domains</span><Chips items={m.funnel.landingDomains}/></div>

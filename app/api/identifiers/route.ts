@@ -12,7 +12,7 @@ export async function GET(req:NextRequest){
   if(id){
    const c=await getInvestigation(id);
    if(!c)return Response.json({error:"Investigation not found"},{status:404});
-   const rows=identifierRows(c.profile);
+   const rows=identifierRows(c.profile,c.marketing,c.domain);
    const matches=await matchIdentifiers(rows.map(r=>r.normalized),id);
    return Response.json({identifiers:rows,matches});
   }

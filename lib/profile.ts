@@ -28,6 +28,11 @@ export type Marketing={
  instagram?:{posts?:number;likes?:number;comments?:number;maxLikes?:number}|null;
  email?:{total?:number;marketing?:number;abandonedCart?:number;confirmations?:number;firstSent?:string|null;lastSent?:string|null;recentSubjects?:string[]}|null;
  funnel?:{landingDomains?:string[];usesPresellOrAdvertorial?:boolean|null;checkoutSubdomains?:string[];notes?:string}|null;
+ // Running landing pages from Atria's ad library (landing URLs) plus BrandSearch funnel types.
+ landing?:{asOf?:string;source?:string;notes?:string;totalActiveAds?:number;sampledActiveAds?:number;
+  advertisers?:{id:string;name:string;totalAds?:number;role?:string}[];
+  landingPages?:{url:string;host?:string;path?:string;kind?:string;activeAds?:number;bestRank?:number|null;maxDaysRunning?:number|null;pages?:string[];headline?:string|null;status?:string}[];
+  hosts?:{host:string;activeAds:number}[];kindMix?:Record<string,number>;brandsearchFunnelMix?:Record<string,number>|null}|null;
  strategy?:{summary?:string;channels?:string[];angles?:string[];offers?:string[];audience?:string[];creativeStyle?:string[];scale?:string;complianceFlags?:string[]}|null;
 };
 
@@ -48,8 +53,8 @@ const IGNORE=new Set(["1220658","shopify","gmail.com"]);
 // App/vendor names ("Triple Whale", "Recharge") are shared by unrelated stores; only real account IDs or script hosts link brands.
 const isTrackingId=(v:string)=>/\d/.test(v)&&!/\s/.test(v.trim());
 
-export function identifierRows(p?:Profile|null):IdentifierRow[]{
- if(!p)return [];
+export function identifierRows(p?:Profile|null,m?:Marketing|null,ownDomain?:string|null):IdentifierRow[]{
+ if(!p&&!m)return [];p=p||{};
  const out:IdentifierRow[]=[];const seen=new Set<string>();
  const add=(kind:string,v?:string|null)=>{if(!v)return;const n=norm(kind,v);if(n.length<4||IGNORE.has(n))return;const k=kind+"|"+n;if(seen.has(k))return;seen.add(k);out.push({kind,value:String(v).trim(),normalized:n})};
  const id=p.identifiers||{};
@@ -62,12 +67,15 @@ export function identifierRows(p?:Profile|null):IdentifierRow[]{
  p.people?.forEach(x=>add("person",x.name));
  p.trademarks?.forEach(t=>{add("trademark_serial",t.serial);add("attorney",t.attorney)});
  p.addresses?.forEach(a=>{if(!a.massAddress&&a.kind!=="registered_agent")add("address",a.address)});
+ // Off-site funnel hosts (presell/advertorial domains) that ads send traffic to; marketplaces and social hosts are shared by everyone.
+ const own=(ownDomain||"").replace(/^www\./,"").split(".").slice(-2).join(".");
+ m?.landing?.landingPages?.forEach(l=>{const h=(l.host||"").toLowerCase().replace(/^www\./,"");if(!h||(own&&h.endsWith(own))||/amazon\.|walmart\.|target\.com|tiktok\.|facebook\.|instagram\.|fb\.me|linktr\.ee|myshopify\.com$|apple\.com|google\./.test(h))return;add("funnel_host",h)});
  return out;
 }
 
-export const KIND_LABEL:Record<string,string>={shopify_store:"Shopify store",shopify_shop_id:"Shopify shop ID",google_analytics:"Google Analytics",gtm:"Tag Manager",google_ads:"Google Ads",meta_pixel:"Meta pixel",tiktok_pixel:"TikTok pixel",clarity:"Clarity",klaviyo:"Klaviyo",tracking:"Tracking ID",checkout_account:"Checkout account",payment_id:"Payment ID",amazon_seller:"Amazon seller",card_descriptor:"Card descriptor",email:"Email",phone:"Phone",domain:"Domain",company:"Company",person:"Person",trademark_serial:"Trademark serial",attorney:"Trademark attorney",address:"Address"};
+export const KIND_LABEL:Record<string,string>={shopify_store:"Shopify store",shopify_shop_id:"Shopify shop ID",google_analytics:"Google Analytics",gtm:"Tag Manager",google_ads:"Google Ads",meta_pixel:"Meta pixel",tiktok_pixel:"TikTok pixel",clarity:"Clarity",klaviyo:"Klaviyo",tracking:"Tracking ID",checkout_account:"Checkout account",payment_id:"Payment ID",amazon_seller:"Amazon seller",card_descriptor:"Card descriptor",email:"Email",phone:"Phone",domain:"Domain",company:"Company",person:"Person",trademark_serial:"Trademark serial",attorney:"Trademark attorney",address:"Address",funnel_host:"Funnel host"};
 // Kinds that are strong operator signals when shared, vs. ones that only show a common service provider.
-export const STRONG_KINDS=new Set(["shopify_store","shopify_shop_id","google_analytics","gtm","google_ads","meta_pixel","tiktok_pixel","clarity","klaviyo","checkout_account","payment_id","amazon_seller","card_descriptor","email","phone","company","person","trademark_serial","domain","address"]);
+export const STRONG_KINDS=new Set(["shopify_store","shopify_shop_id","google_analytics","gtm","google_ads","meta_pixel","tiktok_pixel","clarity","klaviyo","checkout_account","payment_id","amazon_seller","card_descriptor","email","phone","company","person","trademark_serial","domain","address","funnel_host"]);
 
 // Compact labels stored on the investigation for filtering in the sidebar.
 export function tagsFor(p?:Profile|null,m?:Marketing|null,network?:string|null):string[]{
