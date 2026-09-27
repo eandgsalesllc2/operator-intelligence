@@ -6,7 +6,7 @@ import {Draft,addEdge,addEvidence,addNode,emptyDraft} from "./case-builder";
 import {ProviderContext,ProviderFinding,ProviderResult,ResearchProvider} from "./providers";
 
 const MODEL="claude-opus-5";
-const RESEARCH_DEADLINE_MS=210_000;
+const RESEARCH_DEADLINE_MS=180_000;
 
 const SYSTEM=`You are an OSINT business-ownership analyst mapping who legally owns, who operates, and who is connected to direct-to-consumer ecommerce brands (mostly supplements and wellness). You are given one seed — a brand, domain, person, company, trademark, address, phone or email — plus preliminary findings already collected. Investigate outward with web search and web fetch.
 
@@ -22,7 +22,7 @@ Rules:
 - Do not overclaim. Distinguish legal owner, IP owner, officer/manager, operator, agency or service provider, registered agent, fulfillment, and shared vendor. Registered-agent and virtual-office addresses, checkout/subscription vendors, trademark attorneys and shared templates never establish ownership on their own.
 - Label every conclusion CONFIRMED (direct documentary evidence), STRONG (several independent signals agree), CORRELATION (real overlap that does not show ownership), LEAD (worth checking) or EXCLUDED (checked and ruled out).
 - Every claim needs a source URL and what exactly that source says. Never invent URLs, names, dates or registration numbers. If a source was blocked, say so.
-- Business roles only. Do not record residential addresses, personal emails or phones, or family details.
+- Business roles only. Do not record residential addresses, personal emails or phones, relatives, or family details — not even to rule them out.
 - Do not bypass CAPTCHAs, log in anywhere, or submit forms.
 
 Write your final answer as a dossier: a one-sentence cautious summary; then sections for Entities (name, type, role, confidence), Relationships (from → label → to, confidence, source URL), Connected brands/domains, Timeline (dated events with sources), Evidence log (URL — what it says), and Open questions.`;
@@ -93,7 +93,7 @@ class ClaudeResearchProvider implements ResearchProvider{
   const parsed=await client.messages.parse({
    model:MODEL,max_tokens:16000,
    thinking:{type:"adaptive"},output_config:{effort:"medium",format:zodOutputFormat(CaseSchema)},
-   system:"Convert an OSINT dossier into a case graph. Use only facts in the dossier. The seed entity's node key must be \"seed\". Keep the dossier's confidence labels; never raise them. Every evidence url must be one of the listed sources or a URL quoted in the dossier. Leave out residential addresses and personal contact details. 6–25 nodes.",
+   system:"Convert an OSINT dossier into a case graph. Use only facts in the dossier. Nodes are only brands, people in business roles, companies, trademarks, domains, business addresses, business phones and business emails; put events (recalls, lawsuits, filings, articles) in the timeline and evidence instead, never as nodes. Never add relatives or private individuals, including excluded name collisions of people. The seed entity's node key must be \"seed\". Keep the dossier's confidence labels; never raise them. Every evidence url must be one of the listed sources or a URL quoted in the dossier. Leave out residential addresses and personal contact details. 6–25 nodes.",
    messages:[{role:"user",content:`${seedLine}\n\nDOSSIER:\n${dossier}\n\nSOURCES SEEN:\n${sourceList}`}],
   });
   const out=parsed.parsed_output;
