@@ -1,5 +1,5 @@
 import {Case,NodeType} from "./types";
-import {providers,ProviderContext,ProviderFinding} from "./providers";
+import {portfolio,providers,ProviderContext,ProviderFinding} from "./providers";
 import {aiResearchEnabled,claudeResearch} from "./ai-research";
 import {Draft,layout,mergeDraft} from "./case-builder";
 import {cleanDomain,isPublicHostname} from "./net";
@@ -70,6 +70,14 @@ export async function runResearchJob(job:any){
    }catch(e){notes.push(`${p.label}: failed — ${e instanceof Error?e.message:"error"}`)}
    done++;await log(`${p.label} done (${done}/${active.length})`,10+Math.round(done/active.length*(aiResearchEnabled()?30:80)));
   }));
+  // Second pass: look up what the site revealed (companies, people, emails, phones) in other investigations.
+  const discovered=drafts.flatMap(d=>d.nodes).filter(n=>n.key!=="seed"&&["company","person","email"].includes(n.type)&&n.confidence!=="lead"&&n.confidence!=="excluded").slice(0,8);
+  if(discovered.length){
+   try{const r=await portfolio.runTerms(ctx,discovered.map(n=>({term:n.type==="company"?n.label.replace(/,?\s+(L\.?L\.?C\.?|Inc\.?|Incorporated|Corp\.?|Corporation|Ltd\.?|Limited|GmbH|B\.V\.|PBC|LLP|UAB)\.?$/i,""):n.label,from:n.key})));
+    for(const n of discovered)r.draft.nodes.push({...n});drafts.push(r.draft);notes.push(`Cross-investigation links: ${r.notes.join("; ")}`);
+    if(r.findings.length){await saveProviderFindings({investigationId:c.id,jobId:job.id,provider:"portfolio",findings:r.findings});findingsTotal+=r.findings.length}}
+   catch(e){notes.push(`Cross-investigation links: failed — ${e instanceof Error?e.message:"error"}`)}
+  }
   let merged=c;
   for(const d of drafts)merged=mergeDraft(merged,d,seedNode.id);
   if(aiResearchEnabled()){

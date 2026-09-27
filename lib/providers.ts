@@ -118,7 +118,7 @@ class FirstPartyProvider implements ResearchProvider{
    for(const m of h.text.matchAll(COPYRIGHT_RE)){const n=tidy(m[1]);if(new RegExp(SUFFIX+"$").test(n))bump(n,3,"copyright holder",h.url,snippetAround(m.index||0))}
    for(const m of h.text.matchAll(EMAIL_RE)){const e=m[0].toLowerCase();if(/\.(png|jpe?g|gif|webp|svg)$|sentry|example\.|wixpress|@2x|u003e/.test(e))continue;if(!emails.has(e))emails.set(e,h.url)}
    if(legal)for(const m of h.text.matchAll(PHONE_RE)){const p=m[0].trim();const digits=p.replace(/\D/g,"");if(digits.length<10||/^(\d)\1+$/.test(digits))continue;if(!phones.has(digits))phones.set(digits,p+"|"+h.url)}
-   for(const m of h.text.matchAll(ADDRESS_RE)){const a=tidy(m[0]);if(!addresses.has(a.toLowerCase()))addresses.set(a.toLowerCase(),a+"|"+h.url)}
+   for(const m of h.text.matchAll(ADDRESS_RE)){const a=tidy(m[0]);const k=keyFor("address",a);if(!addresses.has(k))addresses.set(k,a+"|"+h.url)}
    const raw=h.html;
    for(const re of [/\bGTM-[A-Z0-9]{5,9}\b/g,/\bG-[A-Z0-9]{8,12}\b/g,/\bAW-\d{8,12}\b/g,/\bUA-\d{4,10}-\d{1,3}\b/g])for(const m of raw.matchAll(re))ids.add(m[0]);
    for(const m of raw.matchAll(/fbq\(\s*['"]init['"]\s*,\s*['"](\d{10,20})['"]/g))ids.add("Meta pixel "+m[1]);
@@ -222,7 +222,7 @@ class WaybackProvider implements ResearchProvider{
   const d=emptyDraft();
   const url=`https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(ctx.domain)}&output=json&limit=1&fl=timestamp,original`;
   try{
-   const r=await safeFetch(url,{timeoutMs:10000,accept:"application/json"});
+   const r=await safeFetch(url,{timeoutMs:20000,accept:"application/json"});
    const rows=JSON.parse(r.body||"[]");
    if(rows.length<2)return {findings:[],draft:d,notes:["No Wayback captures found"]};
    const ts=String(rows[1][0]);const date=`${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}`;
@@ -263,15 +263,18 @@ class PortfolioProvider implements ResearchProvider{
  name="portfolio";label="Your existing investigations";
  supports(){return true}
  async run(ctx:ProviderContext):Promise<ProviderResult>{
+  return this.runTerms(ctx,[{term:ctx.seedValue,from:"seed"},...(ctx.domain&&ctx.domain!==ctx.seedValue?[{term:ctx.domain,from:"seed"}]:[])]);
+ }
+ // Each term is linked from the node it came from ("seed" or a discovered entity's key).
+ async runTerms(ctx:ProviderContext,terms:{term:string;from:string}[]):Promise<ProviderResult>{
   const d=emptyDraft();const findings:ProviderFinding[]=[];
-  const terms=[ctx.seedValue,...(ctx.domain&&ctx.domain!==ctx.seedValue?[ctx.domain]:[])];
-  const matches=(await Promise.all(terms.map(t=>searchPortfolio(t,ctx.investigationId)))).flat();
+  const matches=(await Promise.all(terms.map(async t=>(await searchPortfolio(t.term,ctx.investigationId)).map(m=>({...m,from:t.from}))))).flat();
   const seenCases=new Set<string>();
   for(const m of matches.slice(0,25)){
    if(seenCases.has(m.investigation.id+m.entity.label))continue;seenCases.add(m.investigation.id+m.entity.label);
    const brandKey=addNode(d,{type:"brand",label:m.investigation.name,subtitle:`Existing investigation · ${m.investigation.domain||m.investigation.id}`,confidence:m.entity.confidence==="excluded"?"excluded":"correlation",details:[`Matched entity: ${m.entity.label} (${m.entity.type})`,...m.relations.slice(0,4).map(r=>`${r.label} (${r.confidence}) in that case`)]});
    const rel=m.relations[0];
-   addEdge(d,{from:"seed",to:brandKey,label:rel?rel.label:"CORRELATION",confidence:rel&&rel.confidence!=="confirmed"?rel.confidence:rel?"strong":"correlation"});
+   addEdge(d,{from:m.from,to:brandKey,label:rel?rel.label:"CORRELATION",confidence:rel&&rel.confidence!=="confirmed"?rel.confidence:rel?"strong":"correlation"});
    addEvidence(d,{title:`Appears in investigation “${m.investigation.name}”`,source:`/investigations/${m.investigation.id}`,confidence:"correlation",note:`${m.entity.label} is recorded there as a ${m.entity.type} (${m.entity.confidence})${rel?`, linked by ${rel.label}`:""}. Review that case's evidence before treating this as ownership.`});
    findings.push({title:m.investigation.name,url:`/investigations/${m.investigation.id}`,publisher:"Operator Intelligence",snippet:`${m.entity.label} (${m.entity.type})`,sourceType:"portfolio",entities:[],claims:[]});
   }
@@ -279,5 +282,6 @@ class PortfolioProvider implements ResearchProvider{
  }
 }
 
-export const providers:ResearchProvider[]=[new PortfolioProvider(),new FirstPartyProvider(),new RdapProvider(),new WaybackProvider(),new CertProvider()];
+export const portfolio=new PortfolioProvider();
+export const providers:ResearchProvider[]=[portfolio,new FirstPartyProvider(),new RdapProvider(),new WaybackProvider(),new CertProvider()];
 export {cleanDomain};
