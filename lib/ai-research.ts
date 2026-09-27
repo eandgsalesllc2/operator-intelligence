@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import {z} from "zod";
 import {zodOutputFormat} from "@anthropic-ai/sdk/helpers/zod";
 import {NodeType} from "./types";
+import {CATEGORIES} from "./categories";
 import {Draft,addEdge,addEvidence,addNode,emptyDraft} from "./case-builder";
 import {ProviderContext,ProviderFinding,ProviderResult,ResearchProvider} from "./providers";
 
@@ -30,6 +31,7 @@ Write your final answer as a dossier: a one-sentence cautious summary; then sect
 const NODE_TYPES=["brand","person","company","trademark","domain","address","phone","email"] as const;
 const CONF=["confirmed","strong","correlation","lead","excluded"] as const;
 const CaseSchema=z.object({
+ category:z.enum(CATEGORIES).describe("What the seed brand (or the brands tied to a person/company seed) mainly sells"),
  summary:z.string().describe("One or two cautious sentences separating legal owner from operator"),
  nodes:z.array(z.object({key:z.string().describe('"seed" for the seed entity; otherwise a short unique slug'),label:z.string(),type:z.enum(NODE_TYPES),subtitle:z.string().describe("Role, e.g. 'Legal seller named in terms'"),confidence:z.enum(CONF),details:z.array(z.string())})),
  edges:z.array(z.object({from:z.string(),to:z.string(),label:z.string().describe("e.g. LEGAL OWNER, IP OWNER, TRADEMARK OWNER, MANAGES, DIRECTOR OF, OPERATES, EMPLOYED BY, CO-OWNER, FILED, MERCHANT FOR, SHARED ADDRESS, SHARED PHONE, SHARED EMAIL, SHARED INFRASTRUCTURE, PREDECESSOR, REBRANDED TO, PIVOT / INVESTIGATE"),confidence:z.enum(CONF)})),
@@ -109,6 +111,7 @@ class ClaudeResearchProvider implements ResearchProvider{
    draft.timeline=out.timeline.filter(t=>/^\d{4}/.test(t.date));
    draft.questions=out.open_questions.slice(0,6);
    draft.summary=out.summary;
+   draft.category=out.category;
   }
   const findings:ProviderFinding[]=[
    {title:`Research dossier: ${ctx.seedValue}`,url:`claude-research://${encodeURIComponent(ctx.seedValue)}`,publisher:"Claude web research",snippet:dossier.slice(0,20000),sourceType:"ai_research",entities:draft.nodes.map(n=>({type:n.type,label:n.label,subtitle:n.subtitle})),claims:draft.edges.map(e=>({from:e.from,to:e.to,label:e.label,claim:`${e.from} ${e.label} ${e.to} (${e.confidence})`}))},

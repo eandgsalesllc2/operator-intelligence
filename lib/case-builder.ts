@@ -8,7 +8,7 @@ import {normalizeEntity} from "./confidence";
 export type DraftNode={key:string;label:string;type:NodeType;subtitle:string;confidence:Confidence;details:string[]};
 export type DraftEdge={from:string;to:string;label:string;confidence:Confidence};
 export type DraftEvidence={title:string;source:string;confidence:Confidence;note:string};
-export type Draft={nodes:DraftNode[];edges:DraftEdge[];evidence:DraftEvidence[];timeline:{date:string;title:string;body:string}[];questions:string[];summary?:string};
+export type Draft={nodes:DraftNode[];edges:DraftEdge[];evidence:DraftEvidence[];timeline:{date:string;title:string;body:string}[];questions:string[];summary?:string;category?:string};
 
 export const emptyDraft=():Draft=>({nodes:[],edges:[],evidence:[],timeline:[],questions:[]});
 export const RANK:Record<Confidence,number>={confirmed:0,strong:1,correlation:2,lead:3,excluded:4};
@@ -92,5 +92,5 @@ export function mergeDraft(c:Case,d:Draft,seedNodeId:string):Case{
  timeline.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
  const openQuestions=[...c.openQuestions];
  for(const q of d.questions)if(!openQuestions.includes(q))openQuestions.push(q);
- return {...c,summary:d.summary||c.summary,nodes:layout(nodes,seedNodeId),edges,evidence,timeline,openQuestions:openQuestions.slice(0,15)};
+ return {...c,summary:d.summary||c.summary,category:c.category||d.category||"",nodes:layout(nodes,seedNodeId),edges,evidence,timeline,openQuestions:openQuestions.slice(0,15)};
 }

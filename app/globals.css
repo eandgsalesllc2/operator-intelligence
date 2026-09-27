@@ -60,3 +60,7 @@ header{gap:12px}
 
 .actionbar{gap:8px;flex-wrap:wrap}.actionbar button{white-space:nowrap;flex:none}.actionbar span{flex:1 1 240px;text-align:right;line-height:1.45}
 @media(max-width:900px){.actionbar span{text-align:left}}
+
+.catFilter{margin:0 2px 8px;border:1px solid #1f2b36;border-radius:7px;background:#0d141b;color:#b8c5d1;font:inherit;font-size:12px;padding:7px 8px;outline:none}.catFilter:focus-visible{border-color:#3b8ee4}
+.crumbCat{border:0;background:transparent;color:#8fa7bf;font:inherit;letter-spacing:inherit;padding:0;cursor:pointer}.crumbCat:hover{color:#dce5ee;text-decoration:underline}
+.catRow{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:12px;color:#6f8092}.catRow select{border:1px solid #26333f;border-radius:7px;background:#0d141b;color:#dce5ee;font:inherit;font-size:12px;padding:6px 8px;max-width:100%}

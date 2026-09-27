@@ -4,5 +4,5 @@ export type IntelNode={id:string;label:string;type:NodeType;subtitle:string;x:nu
 export type Edge={from:string;to:string;label:string;confidence:Confidence};
 export type Evidence={id:string,title:string,source:string,confidence:Confidence,note:string};
 export type TimelineItem={date:string;title:string;body:string};
-export type Case={id:string,name:string,domain:string,status:string,summary:string,nodes:IntelNode[],edges:Edge[],evidence:Evidence[],timeline:TimelineItem[],openQuestions:string[]};
+export type Case={id:string,name:string,domain:string,status:string,summary:string,category?:string,nodes:IntelNode[],edges:Edge[],evidence:Evidence[],timeline:TimelineItem[],openQuestions:string[]};
 export type InvestigationDraft={name:string;domain:string;seedType:NodeType;notes:string};
