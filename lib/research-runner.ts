@@ -47,6 +47,25 @@ function prelimSummary(d:Draft){
  return [...lines,...(ev.length?["Sources:",...ev]:[])].join("\n");
 }
 
+// Plain-language summary built from the graph when no research model wrote one.
+function describe(c:Case,seedId:string,seedValue:string){
+ const name=(id:string)=>c.nodes.find(n=>n.id===id)?.label||"";
+ const touching=c.edges.filter(e=>e.from===seedId||e.to===seedId);
+ const owners=touching.filter(e=>["LEGAL OWNER","OPERATES","IP OWNER","TRADEMARK OWNER","OWNS"].includes(e.label)&&e.to===seedId&&(e.confidence==="confirmed"||e.confidence==="strong")).map(e=>`${name(e.from)} (${e.label.toLowerCase()}, ${e.confidence})`);
+ const cases=c.nodes.filter(n=>n.subtitle.startsWith("Existing investigation")&&n.confidence!=="excluded");
+ const parts:string[]=[];
+ if(owners.length)parts.push(`${seedValue}: ${owners.slice(0,3).join("; ")}.`);
+ if(cases.length){
+  const links=cases.slice(0,6).map(n=>{const e=c.edges.find(e=>e.to===n.id);return `${n.label}${e?` (${e.label.toLowerCase()}, ${e.confidence})`:""}`});
+  parts.push(`Linked to ${cases.length} existing investigation${cases.length>1?"s":""}: ${links.join(", ")}.`);
+ }
+ const shared=touching.filter(e=>e.label.startsWith("SHARED")).length;
+ if(shared)parts.push(`${shared} contact or infrastructure identifiers recorded for pivoting.`);
+ if(!parts.length)parts.push(`No ownership evidence found yet for ${seedValue}.`);
+ parts.push("Shared addresses, vendors and templates are correlation, not proof of ownership.");
+ return parts.join(" ");
+}
+
 export async function runResearchJob(job:any){
  const seedType=job.seed_type as NodeType;
  let lastLog=0;
@@ -90,6 +109,7 @@ export async function runResearchJob(job:any){
     merged=mergeDraft(merged,r.draft,seedNode.id);
    }catch(e){notes.push(`${claudeResearch.label}: failed — ${e instanceof Error?e.message:"error"}`)}
   }
+  if(!aiResearchEnabled()||merged.summary===c.summary)merged={...merged,summary:describe(merged,seedNode.id,job.seed_value)};
   const added=merged.nodes.length-c.nodes.length, newEvidence=merged.evidence.length-c.evidence.length;
   const today=new Date().toISOString().slice(0,10);
   const empty=findingsTotal===0&&added===0&&newEvidence===0;

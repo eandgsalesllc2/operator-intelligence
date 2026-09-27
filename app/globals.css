@@ -57,3 +57,6 @@ header{gap:12px}
 .emptyPanel{padding:40px 20px;text-align:center;color:#687887;font-size:13px}
 .expand{margin-top:8px}.expand.ghost{background:transparent;border-color:#2a3a4a}.expand:disabled,.actionbar button:disabled{opacity:.5;cursor:not-allowed}
 .hint.left{text-align:left;margin:4px 0 10px}
+
+.actionbar{gap:8px;flex-wrap:wrap}.actionbar button{white-space:nowrap;flex:none}.actionbar span{flex:1 1 240px;text-align:right;line-height:1.45}
+@media(max-width:900px){.actionbar span{text-align:left}}
