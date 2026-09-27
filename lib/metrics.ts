@@ -18,8 +18,12 @@ export type Metrics={
  sourceUrl?:string;
  asOf?:string;
  method?:string;
+ // Subscription-focused brands: MRR = forecast monthly revenue × assumed subscription take rate.
+ subscription?:{focused:boolean;signals?:string[];takeRate?:number;mrr?:{low:number;mid:number;high:number}|null}|null;
 };
 export const REVENUE_METHOD="Forecast, not reported revenue: monthly visits × conversion (1% / 2% / 3%, halved when the order value is over $150) × average order value (median price of the top-5 bestsellers by rank, ignoring items under $5; ×1 / ×1.3 / ×1.6 for bundles and upsells).";
+
+export const MRR_METHOD="Estimated MRR, not reported: forecast monthly revenue × 70% assumed subscription take rate. Only shown for brands with a subscription signal (a subscription app such as Recharge, Loop or Skio on the store, or subscribe-and-save offers in their ads).";
 
 export function forecast(visits:number|null|undefined,prices:number[]):{aov:number|null;revenue:Metrics["revenue"]}{
  const p=prices.filter(x=>x>=5).slice(0,5);
