@@ -74,3 +74,30 @@ header{gap:12px}
 
 .amber{color:#f5b942}.stats .range{display:block;font-size:10.5px;color:#6f8092;margin-top:3px;font-variant-numeric:tabular-nums}
 .metricsNote{margin:-10px 0 18px;font-size:11.5px;color:#6f8092;line-height:1.55}.metricsNote a{color:#6faeff}.metricsNote span{border-bottom:1px dotted #43525f;cursor:help}
+
+/* profile & marketing */
+.profile{display:grid;gap:14px;margin-top:18px}
+.pcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.pcard,.psec{border:1px solid #1b2833;border-radius:10px;background:#0b1218;padding:14px 16px;display:grid;gap:8px;align-content:start;min-width:0}
+.pcard.wide{grid-column:1/-1}
+.pcard h4,.psec h4{margin:0;display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7f91a3}
+.psec h5{margin:10px 0 6px;font-size:11px;color:#8494a3;display:flex;gap:6px;align-items:center}
+.pcard p,.psec p{margin:0;color:#b3c0cc;font-size:12.5px;line-height:1.55}
+.pcard.own b{font-size:18px}.pcard.own.ok b{color:#35d07f}.pcard.own.warn b{color:#f5b942}.pcard.own.bad b{color:#ff8a93}
+.lead2{font-size:13.5px!important;color:#dce5ee!important}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:start;font-size:12.5px;padding:5px 0;border-top:1px solid #131e27}.kv:first-of-type{border-top:0}
+.kv>span{color:#6f8092;font-size:11.5px;display:flex;gap:5px;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chipTag{display:inline-flex;gap:4px;align-items:center;font-size:11.5px;border:1px solid #243342;background:#101a23;color:#c3d0dc;border-radius:5px;padding:2px 7px;max-width:100%;overflow-wrap:anywhere}
+.chipTag em{font-style:normal;color:#6f8092}.chipTag.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px}
+.chipTag.linked{border-color:#2d6fb5;background:#0f2034;color:#9cc8ff}.chipTag.linked b{font-weight:600}
+.chipTag.warn{border-color:#5a4520;background:#1d160a;color:#f5c989}.chipTag.bad{border-color:#5a2a30;background:#1a0d10;color:#ff9aa2}.chipTag.dim{color:#7f8e9b}
+.dim{color:#6f8092}.small{font-size:11.5px!important}.bad{color:#ff8a93}.warnTxt{color:#f5b942}
+.linked{display:grid;gap:6px}.linked button{display:grid;text-align:left;border:1px solid #1f3348;background:#0c1621;border-radius:7px;padding:7px 9px;cursor:pointer;color:#dce5ee}.linked button:hover{border-color:#3d9cff}.linked button span{font-size:11px;color:#7f91a3;overflow-wrap:anywhere}
+.tableWrap{overflow-x:auto}.ptable{width:100%;border-collapse:collapse;font-size:12px;min-width:640px}.ptable th{text-align:left;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:#627181;padding:7px 8px;border-bottom:1px solid #1b2833}.ptable td{padding:7px 8px;border-bottom:1px solid #131e27;vertical-align:top;color:#c3d0dc}.ptable a{color:#6faeff}
+.mstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.mstats div{border:1px solid #1b2833;border-radius:8px;padding:9px 11px;background:#0c131a}.mstats small{display:block;font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:#627181}.mstats b{font-size:18px;display:block;margin-top:3px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.bars{display:grid;gap:5px}.bar{display:grid;grid-template-columns:90px 1fr 52px;gap:8px;align-items:center;font-size:11.5px;color:#9fb0c0}.bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar i{height:6px;background:#15212b;border-radius:3px;overflow:hidden}.bar i em{display:block;height:100%;background:#3d9cff}.bar b{font-weight:500;text-align:right;font-variant-numeric:tabular-nums}
+.ads{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}.adCard{border:1px solid #1b2833;border-radius:8px;padding:10px 12px;background:#0c131a;display:grid;gap:6px;align-content:start}.adCard p{font-style:italic}.adTop{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.subjects{margin:4px 0 0;padding-left:16px;font-size:12px;color:#b3c0cc;display:grid;gap:3px}
+@media(max-width:700px){.kv{grid-template-columns:1fr;gap:3px}}

@@ -3,7 +3,9 @@ import {portfolio,providers,ProviderContext,ProviderFinding} from "./providers";
 import {aiResearchEnabled,claudeResearch} from "./ai-research";
 import {Draft,layout,mergeDraft} from "./case-builder";
 import {cleanDomain,isPublicHostname} from "./net";
-import {getInvestigation,saveInvestigation,saveProviderFindings,updateResearchJob} from "./repository";
+import {getInvestigation,matchIdentifiers,saveInvestigation,saveProviderFindings,updateResearchJob} from "./repository";
+import {identifierRows,KIND_LABEL,STRONG_KINDS,type Profile} from "./profile";
+import {addEdge,addEvidence,addNode,emptyDraft} from "./case-builder";
 
 const FREE_MAIL=/@(gmail|yahoo|hotmail|outlook|icloud|aol|proton|protonmail|live|msn|me|gmx|yandex|mail)\./i;
 
@@ -79,12 +81,12 @@ export async function runResearchJob(job:any){
   const domain=domainFor(c,job.seed_value,seedType);
   const ctx:ProviderContext={seedValue:job.seed_value,seedType,domain,investigationId:c.id,log:m=>log(m)};
   const active=providers.filter(p=>p.supports(ctx));
-  const drafts:Draft[]=[];const notes:string[]=[];let findingsTotal=0;
+  const drafts:Draft[]=[];const notes:string[]=[];let findingsTotal=0;const found:NonNullable<Profile["identifiers"]>[]=[];
   let done=0;
   await Promise.all(active.map(async p=>{
    try{
     const r=await p.run(ctx);
-    drafts.push(r.draft);notes.push(`${p.label}: ${r.notes.join("; ")}`);
+    drafts.push(r.draft);notes.push(`${p.label}: ${r.notes.join("; ")}`);if(r.identifiers)found.push(r.identifiers);
     if(r.findings.length){await saveProviderFindings({investigationId:c.id,jobId:job.id,provider:p.name,findings:r.findings});findingsTotal+=r.findings.length}
    }catch(e){notes.push(`${p.label}: failed — ${e instanceof Error?e.message:"error"}`)}
    done++;await log(`${p.label} done (${done}/${active.length})`,10+Math.round(done/active.length*(aiResearchEnabled()?30:80)));
@@ -97,7 +99,19 @@ export async function runResearchJob(job:any){
     if(r.findings.length){await saveProviderFindings({investigationId:c.id,jobId:job.id,provider:"portfolio",findings:r.findings});findingsTotal+=r.findings.length}}
    catch(e){notes.push(`Cross-investigation links: failed — ${e instanceof Error?e.message:"error"}`)}
   }
-  let merged=c;
+  // Merge discovered identifiers into the profile, then link investigations that share them.
+  const profile:Profile={...(c.profile||{}),identifiers:{...(c.profile?.identifiers||{})}};
+  for(const f of found)for(const [k,v] of Object.entries(f)){const cur=(profile.identifiers as any)[k];if(Array.isArray(v))(profile.identifiers as any)[k]=[...new Set([...(cur||[]),...v])];else if(v&&!cur)(profile.identifiers as any)[k]=v}
+  try{
+   const ms=(await matchIdentifiers(identifierRows(profile).map(r=>r.normalized),c.id)).filter(m=>STRONG_KINDS.has(m.kind)&&m.kind!=="attorney");
+   if(ms.length){const d=emptyDraft();const seen=new Set<string>();
+    for(const m of ms){if(seen.has(m.investigation_id+m.kind))continue;seen.add(m.investigation_id+m.kind);
+     const k=addNode(d,{type:"brand",label:m.name,subtitle:`Existing investigation · ${m.domain||m.investigation_id}`,confidence:"strong",details:[`Shares ${KIND_LABEL[m.kind]||m.kind}: ${m.value}`]});
+     addEdge(d,{from:"seed",to:k,label:"SHARED INFRASTRUCTURE",confidence:["company","person","trademark_serial"].includes(m.kind)?"strong":"correlation"});
+     addEvidence(d,{title:`Shared ${KIND_LABEL[m.kind]||m.kind} with ${m.name}`,source:`/investigations/${m.investigation_id}`,confidence:"correlation",note:`${m.value} appears on both. Shared tracking IDs, accounts and contacts point to a common operator; confirm with registry or trademark records.`})}
+    drafts.push(d);notes.push(`Identifier matches: ${new Set(ms.map(m=>m.investigation_id)).size} investigations`)}
+  }catch(e){notes.push("Identifier matching failed: "+(e instanceof Error?e.message:"error"))}
+  let merged:Case={...c,profile};
   for(const d of drafts)merged=mergeDraft(merged,d,seedNode.id);
   if(aiResearchEnabled()){
    await log("Starting web research",45);

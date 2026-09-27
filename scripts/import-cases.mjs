@@ -51,7 +51,7 @@ function layout(nodes){
 function toCase(c){
   const p=id=>`${c.id}:${id}`;
   return {
-    id:c.id,name:c.name,domain:c.domain||"",status:c.status||"Active investigation",category:c.category||"",...(c.metrics?{metrics:c.metrics}:{}),
+    id:c.id,name:c.name,domain:c.domain||"",status:c.status||"Active investigation",category:c.category||"",...(c.metrics?{metrics:c.metrics}:{}),...(c.profile?{profile:c.profile}:{}),...(c.marketing?{marketing:c.marketing}:{}),
     summary:c.network?`[${c.network}] ${c.summary}`:c.summary,
     nodes:layout(c.nodes).map(n=>({id:p(n.id),label:n.label,type:n.type,subtitle:n.subtitle||"",x:n.x,y:n.y,confidence:n.confidence,details:n.details||[]})),
     edges:c.edges.map(e=>({from:p(e.from),to:p(e.to),label:e.label,confidence:e.confidence})),

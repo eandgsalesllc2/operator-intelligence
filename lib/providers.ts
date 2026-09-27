@@ -2,6 +2,7 @@ import {NodeType} from "./types";
 import {Draft,addEdge,addEvidence,addNode,emptyDraft,keyFor} from "./case-builder";
 import {cleanDomain,isPublicHostname,safeFetch} from "./net";
 import {searchPortfolio} from "./repository";
+import type {Profile} from "./profile";
 
 export type ProviderFinding={
  title:string;
@@ -12,7 +13,7 @@ export type ProviderFinding={
  entities:Array<{type:NodeType;label:string;subtitle:string}>;
  claims:Array<{from?:string;to?:string;label:string;claim:string}>;
 };
-export type ProviderResult={findings:ProviderFinding[];draft:Draft;notes:string[]};
+export type ProviderResult={findings:ProviderFinding[];draft:Draft;notes:string[];identifiers?:NonNullable<Profile["identifiers"]>};
 export type ProviderContext={seedValue:string;seedType:NodeType;domain:string;investigationId:string;log:(msg:string)=>Promise<void>};
 
 export interface ResearchProvider{
@@ -177,7 +178,9 @@ class FirstPartyProvider implements ResearchProvider{
   if(ranked[0])d.questions.push(`Search USPTO for trademarks owned by ${ranked[0].label} to find sibling brands.`);
   if(ids.size)d.questions.push(`Search other stores for the same tracking IDs (${[...ids].slice(0,3).join(", ")}).`);
   notes.push(`Found ${ranked.length} companies, ${emails.size} emails, ${phones.size} phones, ${addresses.size} addresses, ${ids.size} tracking IDs.`);
-  return {findings,draft:d,notes};
+  const pick=(re:RegExp)=>[...ids].filter(x=>re.test(x)).map(x=>x.replace(/^(Meta pixel|Clarity|Klaviyo) /,""));
+  const identifiers={shopifyStore:shop?shop+".myshopify.com":null,googleTagManager:pick(/^GTM-/),googleAnalytics:pick(/^(G|UA)-/),googleAds:pick(/^AW-/),metaPixel:pick(/^Meta pixel /),clarity:pick(/^Clarity /),klaviyo:pick(/^Klaviyo /),checkoutVendor:[...vendors][0]||null,supportEmails:[...emails.keys()].filter(brandDomain),phones:[...phones.values()].map(v=>v.split("|")[0]),relatedDomains:[...subdomains].map(x=>({domain:x,relation:"subdomain",confidence:"confirmed"}))};
+  return {findings,draft:d,notes,identifiers};
  }
 }
 
