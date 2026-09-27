@@ -287,5 +287,6 @@ class PortfolioProvider implements ResearchProvider{
 }
 
 export const portfolio=new PortfolioProvider();
-export const providers:ResearchProvider[]=[portfolio,new FirstPartyProvider(),new RdapProvider(),new WaybackProvider(),new CertProvider()];
+export const firstParty=new FirstPartyProvider();export const certs=new CertProvider();
+export const providers:ResearchProvider[]=[portfolio,firstParty,new RdapProvider(),new WaybackProvider(),certs];
 export {cleanDomain};

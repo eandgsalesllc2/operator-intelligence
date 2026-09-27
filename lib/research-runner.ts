@@ -1,5 +1,5 @@
 import {Case,NodeType} from "./types";
-import {portfolio,providers,ProviderContext,ProviderFinding} from "./providers";
+import {certs,firstParty,portfolio,providers,ProviderContext,ProviderFinding} from "./providers";
 import {aiResearchEnabled,claudeResearch} from "./ai-research";
 import {Draft,layout,mergeDraft} from "./case-builder";
 import {cleanDomain,isPublicHostname} from "./net";
@@ -41,6 +41,25 @@ function domainFor(c:Case,seedValue:string,seedType:NodeType){
  if(seedType==="email"&&!FREE_MAIL.test(seedValue))return seedValue.split("@")[1].toLowerCase();
  if(seedType==="brand"&&c.domain&&c.name.toLowerCase()===seedValue.toLowerCase())return cleanDomain(c.domain);
  return "";
+}
+
+// Fold a research profile into the stored one: keep what is already known, add what is new.
+function mergeProfile(base:Profile,add?:Profile):Profile{
+ if(!add)return base;
+ const uniq=<T,>(a:T[]|undefined,b:T[]|undefined,key:(x:T)=>string)=>{const m=new Map<string,T>();for(const x of [...(a||[]),...(b||[])]){const k=key(x).toLowerCase();if(k&&!m.has(k))m.set(k,x)}return [...m.values()]};
+ const ids={...(base.identifiers||{})} as any;
+ for(const [k,v] of Object.entries(add.identifiers||{}))if(Array.isArray(v))ids[k]=[...new Set([...(ids[k]||[]),...v])];else if(v&&!ids[k])ids[k]=v;
+ const r0=base.reputation||{},r1=add.reputation||{};
+ const deep=base.research?.depth==="deep";
+ return {...base,identifiers:ids,
+  entities:uniq(base.entities,add.entities,e=>e.name),
+  trademarks:uniq(base.trademarks,add.trademarks,t=>t.serial||t.mark),
+  people:uniq(base.people,add.people,p=>p.name),
+  network:base.network?.name||base.network?.parent?base.network:add.network,
+  reputation:{...r0,bbbRating:r0.bbbRating??r1.bbbRating,bbbComplaints:r0.bbbComplaints??r1.bbbComplaints,
+   lawsuits:uniq(r0.lawsuits,r1.lawsuits,l=>l.caseNo||l.title),regulatory:uniq(r0.regulatory,r1.regulatory,x=>x.agency+x.action),risks:[...new Set([...(r0.risks||[]),...(r1.risks||[])])]},
+  research:deep?base.research:{...(base.research||{}),...(add.research||{}),blocked:base.research?.blocked},
+ };
 }
 
 function prelimSummary(d:Draft){
@@ -121,6 +140,20 @@ export async function runResearchJob(job:any){
     notes.push(`${claudeResearch.label}: ${r.notes.join("; ")}`);
     if(r.findings.length){await saveProviderFindings({investigationId:c.id,jobId:job.id,provider:claudeResearch.name,findings:r.findings as ProviderFinding[]});findingsTotal+=r.findings.length}
     merged=mergeDraft(merged,r.draft,seedNode.id);
+    merged={...merged,profile:mergeProfile(merged.profile||{},r.draft.profile)};
+    // The brand sells on a different domain than the one searched (e.g. rhode.com → rhodeskin.com): scan the real store too.
+    const store=r.draft.storeDomain?cleanDomain(r.draft.storeDomain):"";
+    if(store&&isPublicHostname(store)&&store!==domain&&!store.endsWith("."+domain)){
+     await log(`Scanning the brand's store domain ${store}`,85);
+     const sctx:ProviderContext={...ctx,seedType:"brand",domain:store};
+     for(const p of [firstParty,certs]){
+      try{const sr=await p.run(sctx);merged=mergeDraft(merged,sr.draft,seedNode.id);notes.push(`${p.label} (${store}): ${sr.notes.join("; ")}`);
+       if(sr.identifiers)merged={...merged,profile:mergeProfile(merged.profile||{},{identifiers:sr.identifiers})};
+       if(sr.findings.length){await saveProviderFindings({investigationId:c.id,jobId:job.id,provider:p.name,findings:sr.findings});findingsTotal+=sr.findings.length}}
+      catch(e){notes.push(`${p.label} (${store}): failed — ${e instanceof Error?e.message:"error"}`)}
+     }
+     if(!c.domain||cleanDomain(c.domain)===domain){merged={...merged,domain:store};notes.push(`Store domain is ${store}; the investigation now uses it.`)}
+    }
    }catch(e){notes.push(`${claudeResearch.label}: failed — ${e instanceof Error?e.message:"error"}`)}
   }
   if(!aiResearchEnabled()||merged.summary===c.summary)merged={...merged,summary:describe(merged,seedNode.id,job.seed_value)};
