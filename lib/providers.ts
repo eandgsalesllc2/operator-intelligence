@@ -272,6 +272,7 @@ class PortfolioProvider implements ResearchProvider{
   const seenCases=new Set<string>();
   for(const m of matches.slice(0,25)){
    if(seenCases.has(m.investigation.id+m.entity.label))continue;seenCases.add(m.investigation.id+m.entity.label);
+   if(!m.relations.length&&m.entity.id.endsWith(":seed"))continue; // an unresearched seed says nothing
    const brandKey=addNode(d,{type:"brand",label:m.investigation.name,subtitle:`Existing investigation · ${m.investigation.domain||m.investigation.id}`,confidence:m.entity.confidence==="excluded"?"excluded":"correlation",details:[`Matched entity: ${m.entity.label} (${m.entity.type})`,...m.relations.slice(0,4).map(r=>`${r.label} (${r.confidence}) in that case`)]});
    const rel=m.relations[0];
    addEdge(d,{from:m.from,to:brandKey,label:rel?rel.label:"CORRELATION",confidence:rel&&rel.confidence!=="confirmed"?rel.confidence:rel?"strong":"correlation"});
