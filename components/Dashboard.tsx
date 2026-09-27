@@ -59,7 +59,9 @@ export default function Dashboard(){
  const tree=useMemo(()=>{
   const vs=new Map<string,Map<string,Case[]>>();
   for(const x of sideCases){const k=x.category||UNCATEGORIZED;const v=verticalOf(k);if(!vs.has(v))vs.set(v,new Map());const m=vs.get(v)!;if(!m.has(k))m.set(k,[]);m.get(k)!.push(x)}
-  return [...vs.entries()].sort((a,b)=>a[0]===UNCATEGORIZED?1:b[0]===UNCATEGORIZED?-1:a[0].localeCompare(b[0])).map(([v,m])=>({v,n:[...m.values()].reduce((s,l)=>s+l.length,0),cats:[...m.entries()].sort((a,b)=>labelOf(a[0]).localeCompare(labelOf(b[0]))).map(([k,l])=>({k,items:[...l].sort((a,b)=>a.name.localeCompare(b.name))}))}));
+  // Biggest verticals first (Supplements, Beauty, ...); "Other" and uncategorized last.
+  const last=(v:string)=>v===UNCATEGORIZED?2:v==="Other"?1:0;
+  return [...vs.entries()].map(([v,m])=>({v,n:[...m.values()].reduce((s,l)=>s+l.length,0),cats:[...m.entries()].sort((a,b)=>b[1].length-a[1].length||labelOf(a[0]).localeCompare(labelOf(b[0]))).map(([k,l])=>({k,items:[...l].sort((a,b)=>a.name.localeCompare(b.name))}))})).sort((a,b)=>last(a.v)-last(b.v)||b.n-a.n||a.v.localeCompare(b.v));
  },[sideCases]);
  const matches=useMemo(()=>{
   const t=q.trim().toLowerCase();if(t.length<2)return [];
