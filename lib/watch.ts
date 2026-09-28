@@ -68,9 +68,9 @@ export async function checkInvestigation(id:string):Promise<{changes:Change[];ch
   if(plans)profile={...(c.profile||{}),identifiers:{...(c.profile?.identifiers||{}),sellingPlans:plans}};
   const mp=await pullMarketing(c.domain,/\.[a-z]{2,}$/i.test(c.name)?"":c.name).catch(()=>null);
   if(mp?.marketing)marketing={...(c.marketing||{}),...mp.marketing,strategy:c.marketing?.strategy??mp.marketing.strategy};
-  if(mp?.metrics&&mp.metrics.monthlyVisits!=null)metrics={...mp.metrics,subscription:subscriptionFor(mp.metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans)};
+  if(mp?.metrics&&mp.metrics.monthlyVisits!=null)metrics={...mp.metrics,subscription:subscriptionFor(mp.metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans,profile?.identifiers?.subscriptionOverride)};
  }
- if(metrics&&metrics===c.metrics&&profile!==c.profile)metrics={...metrics,subscription:subscriptionFor(metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans)};
+ if(metrics&&metrics===c.metrics&&profile!==c.profile)metrics={...metrics,subscription:subscriptionFor(metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans,profile?.identifiers?.subscriptionOverride)};
  const next=snapshotOf(metrics,marketing,await linkedCases({...c,marketing}).catch(()=>prev.linked));
  const changes=diff(prev,next);
  if(changes.length)await db("oi_watch_changes",{method:"POST",body:JSON.stringify(changes.map(x=>({investigation_id:id,...x})))});

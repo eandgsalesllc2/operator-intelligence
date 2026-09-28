@@ -155,10 +155,22 @@ export async function applySellingPlans(updates:{id:string;plans:import("./selli
  for(const u of updates){
   const r=(await request(`investigations?id=eq.${encodeURIComponent(u.id)}&select=id,summary,profile,marketing,metrics,tags`))?.[0];if(!r)continue;
   const profile={...(r.profile||{}),identifiers:{...(r.profile?.identifiers||{}),sellingPlans:u.plans}};
-  const metrics=r.metrics&&Object.keys(r.metrics).length?{...r.metrics,subscription:subscriptionFor(r.metrics,profile.identifiers.subscriptionApp,r.marketing?.strategy?.offers,u.plans)}:r.metrics;
+  const metrics=r.metrics&&Object.keys(r.metrics).length?{...r.metrics,subscription:subscriptionFor(r.metrics,profile.identifiers.subscriptionApp,r.marketing?.strategy?.offers,u.plans,profile.identifiers.subscriptionOverride)}:r.metrics;
   const tags=[...tagsFor(profile,r.marketing,/^\[(.+?)\]/.exec(r.summary||"")?.[1]),...(metrics?.subscription?.focused?["subscription"]:[])];
   await request("investigations?id=eq."+encodeURIComponent(u.id),{method:"PATCH",body:JSON.stringify({profile,metrics,tags})});
   changed++;if(metrics?.subscription?.focused)nowSub++;
  }
  return {changed,subscription:nowSub};
+}
+
+// Manual subscription call for a brand ("on" / "off", or null to go back to automatic detection).
+export async function setSubscriptionOverride(id:string,value:"on"|"off"|null,note?:string){
+ const {subscriptionFor}=await import("./metrics");
+ const r=(await request(`investigations?id=eq.${encodeURIComponent(id)}&select=id,name,summary,profile,marketing,metrics`))?.[0];if(!r)return null;
+ const override=value?{value,note:note||undefined,at:new Date().toISOString()}:null;
+ const profile={...(r.profile||{}),identifiers:{...(r.profile?.identifiers||{}),subscriptionOverride:override}};
+ const metrics=r.metrics&&Object.keys(r.metrics).length?{...r.metrics,subscription:subscriptionFor(r.metrics,profile.identifiers.subscriptionApp,r.marketing?.strategy?.offers,profile.identifiers.sellingPlans,override)}:r.metrics;
+ const tags=[...tagsFor(profile,r.marketing,/^\[(.+?)\]/.exec(r.summary||"")?.[1]),...(metrics?.subscription?.focused?["subscription"]:[])];
+ await request("investigations?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({profile,metrics,tags})});
+ return {id,name:r.name,subscription:!!metrics?.subscription?.focused};
 }

@@ -45,7 +45,10 @@ export const currencySymbol=(c?:string)=>({USD:"$",EUR:"€",GBP:"£",CAD:"CA$",
 
 // Subscription-focused brands: a subscription app on the store, or subscribe-and-save offers in ads.
 export const SUB_TAKE_RATE=0.7;
-export function subscriptionFor(m:Metrics|undefined,subscriptionApp?:string|null,offers?:string[],sellingPlans?:{productsChecked:number;productsWithPlans:number;subscriptionOnly:number;groups:{name:string;plans:string[];recurring?:boolean}[]}|null):Metrics["subscription"]{
+export function subscriptionFor(m:Metrics|undefined,subscriptionApp?:string|null,offers?:string[],sellingPlans?:{productsChecked:number;productsWithPlans:number;subscriptionOnly:number;groups:{name:string;plans:string[];recurring?:boolean}[]}|null,override?:{value:"on"|"off";note?:string}|null):Metrics["subscription"]{
+ const r0=m?.revenue;
+ if(override?.value==="off")return {focused:false,signals:[`Marked not a subscription brand${override.note?`: ${override.note}`:""}`],takeRate:SUB_TAKE_RATE,mrr:null};
+ if(override?.value==="on")return {focused:true,signals:[`Marked a subscription brand${override.note?`: ${override.note}`:""}`],takeRate:SUB_TAKE_RATE,mrr:r0?{low:Math.round(r0.low*SUB_TAKE_RATE),mid:Math.round(r0.mid*SUB_TAKE_RATE),high:Math.round(r0.high*SUB_TAKE_RATE)}:null};
  const signals:string[]=[];
  // Shopify selling plans on the store are the strongest signal: the brand literally sells on subscription.
  if(sellingPlans&&sellingPlans.productsWithPlans>0){const g=sellingPlans.groups.find(x=>x.recurring!==false);signals.push(`Shopify selling plans on ${sellingPlans.productsWithPlans} of ${sellingPlans.productsChecked} products checked${sellingPlans.subscriptionOnly?` (${sellingPlans.subscriptionOnly} subscription-only)`:""}${g?` — “${g.name}”${g.plans.length?`: ${g.plans.slice(0,3).join(", ")}`:""}`:""}`)}

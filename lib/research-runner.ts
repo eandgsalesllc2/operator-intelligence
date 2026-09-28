@@ -200,9 +200,9 @@ export async function runResearchJob(job:any){
    }
    if(mp?.metrics?.monthlyVisits!=null||(mp?.metrics&&!merged.metrics?.monthlyVisits)){
     const met=mp!.metrics!;
-    merged={...merged,metrics:{...met,subscription:subscriptionFor(met,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers,merged.profile?.identifiers?.sellingPlans)}};
+    merged={...merged,metrics:{...met,subscription:subscriptionFor(met,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers,merged.profile?.identifiers?.sellingPlans,merged.profile?.identifiers?.subscriptionOverride)}};
    }
-   if(merged.metrics&&merged.profile?.identifiers?.sellingPlans)merged={...merged,metrics:{...merged.metrics,subscription:subscriptionFor(merged.metrics,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers,merged.profile.identifiers.sellingPlans)}};
+   if(merged.metrics&&merged.profile?.identifiers?.sellingPlans,merged.profile?.identifiers?.subscriptionOverride)merged={...merged,metrics:{...merged.metrics,subscription:subscriptionFor(merged.metrics,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers,merged.profile.identifiers.sellingPlans,merged.profile.identifiers.subscriptionOverride)}};
   }catch(e){notes.push("Marketing data failed: "+(e instanceof Error?e.message:"error"))}
   if(!aiResearchEnabled()||merged.summary===c.summary)merged={...merged,summary:describe(merged,seedNode.id,job.seed_value)};
   const added=merged.nodes.length-c.nodes.length, newEvidence=merged.evidence.length-c.evidence.length;

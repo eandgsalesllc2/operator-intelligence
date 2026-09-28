@@ -10,6 +10,8 @@ export type Profile={
   checkoutVendor?:string|null;checkoutAccount?:string|null;subscriptionApp?:string|null;paymentIds?:string[];amazonSellers?:string[];cardDescriptors?:string[];
   supportEmails?:string[];phones?:string[];relatedDomains?:RelatedDomain[];
   sellingPlans?:import("./selling-plans").SellingPlans|null;
+  // Manual call that beats every automatic signal: "off" = not a subscription brand (e.g. a device brand whose only plan is a refill add-on).
+  subscriptionOverride?:{value:"on"|"off";note?:string;at?:string}|null;
  };
  entities?:{name:string;role?:string;jurisdiction?:string|null;fileNumber?:string|null;formed?:string|null;status?:string;registeredAgent?:string|null;officers?:{name:string;role?:string;confidence?:string}[];confidence?:string;source?:string|null}[];
  trademarks?:{mark:string;serial?:string|null;registration?:string|null;owner?:string|null;status?:string;filed?:string|null;firstUse?:string|null;attorney?:string|null;classes?:string|null}[];
