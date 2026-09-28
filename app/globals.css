@@ -385,3 +385,12 @@ button.chItem{cursor:pointer}button.chItem:hover{background:#221d17}
 .pfCard:has(.pfHit:hover){transform:translateY(-3px) rotate(-.4deg);box-shadow:0 14px 30px rgba(0,0,0,.45)}
 .watchName{border:0;background:transparent;color:#efe6d6;font:inherit;font-family:var(--f-display);font-size:17px;font-weight:700;text-align:left;padding:0;cursor:pointer}.watchName:hover{color:#fff7ee;text-decoration:underline}
 .drawerSite{margin:4px 0 8px;font-size:13px;color:#e0a07a}
+/* hover/focus descriptions on filter chips */
+.tipped{position:relative}
+.tipped::after{content:attr(data-tip);position:absolute;left:50%;top:calc(100% + 10px);transform:translate(-50%,-4px);width:max-content;max-width:280px;white-space:normal;text-align:left;background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:12.5px;line-height:1.45;font-weight:400;padding:9px 11px;border-radius:4px;box-shadow:0 10px 26px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .12s,transform .12s;z-index:30}
+.tipped::before{content:"";position:absolute;left:50%;top:calc(100% + 4px);margin-left:-6px;border:6px solid transparent;border-bottom-color:var(--paper);border-top:0;opacity:0;transition:opacity .12s;z-index:31}
+.tipped:hover::after,.tipped:focus-visible::after{opacity:1;transform:translate(-50%,0);transition-delay:.25s}
+.tipped:hover::before,.tipped:focus-visible::before{opacity:1;transition-delay:.25s}
+.pfChips .tipped:first-child::after{left:0;transform:translate(0,-4px)}.pfChips .tipped:first-child:hover::after,.pfChips .tipped:first-child:focus-visible::after{transform:translate(0,0)}
+.pfChips .tipped:last-child::after{left:auto;right:0;transform:translate(0,-4px)}.pfChips .tipped:last-child:hover::after,.pfChips .tipped:last-child:focus-visible::after{transform:translate(0,0)}
+@media (hover:none){.tipped::after,.tipped::before{display:none}}

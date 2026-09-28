@@ -8,7 +8,16 @@ import SiteLink from "./SiteLink";
 
 // Every investigation as a case-file card. Uses the sidebar's category/flag/search filters, adds sorting and quick flags.
 const OWN:Record<string,{t:string;tone:string}>={identified:{t:"OWNER IDENTIFIED",tone:"ok"},legal_entity_only:{t:"LEGAL ENTITY ONLY",tone:"warn"},operator_unknown:{t:"OPERATOR UNKNOWN",tone:"bad"},contested:{t:"CONTESTED",tone:"bad"}};
-const QUICK=[["all","All"],["persona-ads","Persona ads"],["subscription","Subscription"],["lawsuit","Lawsuits"],["regulatory","Regulatory"],["ownership:operator_unknown","Operator unknown"],["network:*","In a network"],["needs-deep-dive","Needs deep dive"]] as const;
+const QUICK=[
+ ["all","All","Every brand in this view."],
+ ["persona-ads","Persona ads","Brands whose Meta ads run largely through non-brand pages — “doctor”, persona or creator pages carrying 25%+ of active ads, 3+ such pages live, or research flagging fake doctor pages."],
+ ["subscription","Subscription","Brands that sell on subscription: recurring Shopify selling plans on the store, a subscription app, or subscribe-and-save ads. These show estimated MRR."],
+ ["lawsuit","Lawsuits","At least one lawsuit on record — court cases, class actions, trademark or domain (UDRP) disputes."],
+ ["regulatory","Regulatory","Action by a regulator on record — FDA warning letters, FTC or state attorney-general cases, seizures."],
+ ["ownership:operator_unknown","Operator unknown","No legal entity or operator identified yet — the store doesn't say who runs it and research hasn't found them."],
+ ["network:*","In a network","Brands that share a parent company or operator group with at least one other brand in BrandTracer."],
+ ["needs-deep-dive","Needs deep dive","Ownership isn't settled — research left open questions worth a closer look (registries, trademarks, shared IDs)."],
+] as const;
 const SORTS={visits:"Traffic",revenue:"Est. revenue",ads:"Active ads",name:"Name"} as const;
 const caseNo=(id:string)=>{let h=7;for(const ch of id)h=(h*33+ch.charCodeAt(0))>>>0;return String(h%10000).padStart(4,"0")};
 
@@ -25,7 +34,8 @@ export default function Portfolio({cases,total,flag,setFlag,onOpen,watched,onTog
    <div><div className="pfKicker">CASE FILES</div><h1>{cases.length===total?`${total} brands under investigation`:`${cases.length} of ${total} brands`}</h1><p>{compact(totals.visits)} monthly visits · ~{compact(totals.rev,"$")} est. monthly revenue across this view</p></div>
    <label className="pfSort">Sort by<select value={sort} onChange={e=>setSort(e.target.value as keyof typeof SORTS)}>{Object.entries(SORTS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
   </div>
-  <div className="pfChips" role="group" aria-label="Quick filters">{QUICK.map(([k,v])=><button key={k} aria-pressed={flag===k} className={flag===k?"on":""} onClick={()=>setFlag(k)}>{v}</button>)}</div>
+  <div className="pfChips" role="group" aria-label="Quick filters">{QUICK.map(([k,v,tip])=><button key={k} aria-pressed={flag===k} className={"tipped"+(flag===k?" on":"")} onClick={()=>setFlag(k)} data-tip={tip} aria-describedby={`tip-${k.replace(/[^a-z]/g,"")}`}>{v}</button>)}</div>
+  <div className="sr">{QUICK.map(([k,,tip])=><span key={k} id={`tip-${k.replace(/[^a-z]/g,"")}`}>{tip}</span>)}</div>
   {list.length?<div className="pfGrid">{list.map(x=>{
    const own=(x.tags||[]).find(t=>t.startsWith("ownership:"))?.slice(10);const o=own?OWN[own]:null;const m=x.metrics;const cur=currencySymbol(m?.currency);
    const net=(x.tags||[]).find(t=>t.startsWith("network:"))?.slice(8);
