@@ -1,6 +1,7 @@
 "use client";
 import {Case} from "@/lib/types";
 import {compact} from "@/lib/metrics";
+import AdWall from "./AdWall";
 import {Megaphone,Target,Mail,PlayCircle,Users,Flag,Route,Link2} from "lucide-react";
 
 const KIND_TONE:Record<string,string>={advertorial:"warn",quiz:"warn",offer_lp:"",product:"dim",collection:"dim",home:"dim",marketplace:"",external:"bad",checkout:"dim"};
@@ -41,6 +42,7 @@ export default function MarketingPanel({c}:{c:Case}){
  return <div className="profile">
   {m.dataWarning&&<div className="notice"><Flag size={15}/><span><b>Check this data:</b> {m.dataWarning}</span></div>}
   <MoneyStrip m={m}/>
+  <AdWall investigationId={c.id}/>
   <div className="pcards">
    <section className="pcard wide"><h4><Target size={14}/> Acquisition strategy {s.scale&&<span className={"chipTag "+(SCALE_TONE[s.scale]||"")}>{s.scale} ad scale</span>}</h4><p className="lead2">{s.summary||"No summary."}</p>
     <div className="kv"><span>Channels</span><Chips items={s.channels}/></div>

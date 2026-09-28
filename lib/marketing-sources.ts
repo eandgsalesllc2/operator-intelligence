@@ -183,3 +183,22 @@ export async function pullMarketing(domain:string,brandName:string):Promise<Mark
  const marketing:Marketing|undefined=b&&"marketing" in b&&b.marketing?{...b.marketing,...(a&&"landing" in a?{landing:a.landing}:{})}:a&&"landing" in a?{asOf:a.landing!.asOf,source:"Atria",landing:a.landing}:undefined;
  return {metrics:b&&"metrics" in b?b.metrics:undefined,marketing,reports,...({topCopy:b?.topCopy||[]} as any)};
 }
+
+// ---------------- Live ad creatives for the ad wall (fetched on demand; media URLs expire, so they're not stored) ----------------
+export type Creative={id:string;image:string|null;video:string|null;format:string;title:string|null;body:string;cta:string|null;page:string|null;days:number|null;started:string|null;landing:string|null;source:"atria"|"brandsearch"};
+export async function fetchCreatives(domain:string,atriaBrandId?:string|null,limit=24):Promise<{creatives:Creative[];source:string;note?:string}>{
+ const clip=(s:any,n:number)=>String(s||"").replace(/\s+/g," ").trim().slice(0,n);
+ if(atriaBrandId&&atriaEnabled()){
+  const r=await settle(atria(`/brand-library/${encodeURIComponent(atriaBrandId)}/ads`,{status:["active"],order:"most_impressions",page_size:Math.min(50,limit)}));
+  const items=(r?.data?.items||[]) as any[];
+  if(items.length)return {source:"Atria ad library",creatives:items.map(a=>({id:String(a.id),image:a.images?.[0]?.url||a.videos?.[0]?.preview_image_url||null,video:a.videos?.[0]?.url||null,format:a.videos?.length?"video":a.display_format||"image",title:a.title?clip(a.title,120):null,body:clip(a.body||a.caption,280),cta:a.cta_text||null,page:a.brand_name||null,days:num(a.days_running),started:a.start_date||null,landing:a.link_url?unwrap(a.link_url):null,source:"atria" as const}))};
+ }
+ if(brandsearchEnabled()&&domain){
+  const r=await resolveBrandsearchId(domain);
+  if(r){const d=await settle(bs(`/brands/${encodeURIComponent(r.id)}/ads`,{platform:"meta",status:"active",sort_by:"reach",page_size:Math.min(50,limit)}));
+   const items=(d?.data||[]) as any[];
+   if(items.length)return {source:"BrandSearch",creatives:items.map(a=>({id:String(a.id),image:a.image_url||a.thumbnail_url||null,video:a.video_hd_url||a.video_sd_url||null,format:a.is_video?"video":"image",title:a.creative?.title?clip(a.creative.title,120):null,body:clip(a.creative?.description,280),cta:a.creative?.cta?.text||null,page:a.page_name||null,days:a.start_date?Math.max(0,Math.round((Date.now()-new Date(a.start_date).getTime())/864e5)):null,started:a.start_date||null,landing:null,source:"brandsearch" as const}))};
+  }
+ }
+ return {creatives:[],source:"",note:"No active ad creatives found in Atria or BrandSearch for this brand."};
+}

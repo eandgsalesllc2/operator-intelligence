@@ -3,7 +3,7 @@ import {SESSION_COOKIE,sha256Hex,verifySession} from "@/lib/session";
 
 // Everything requires a signed-in user, except the sign-in/sign-up pages and their API routes.
 // Scripts may call the API with "Authorization: Bearer oi_…" tokens stored (hashed) in oi_api_tokens.
-const PUBLIC=[/^\/login$/,/^\/signup$/,/^\/api\/auth\/(login|signup|logout)$/];
+const PUBLIC=[/^\/login$/,/^\/signup$/,/^\/forgot$/,/^\/reset$/,/^\/api\/auth\/(login|signup|logout|forgot|reset)$/];
 
 async function validApiToken(req:NextRequest){
  const h=req.headers.get("authorization")||"";

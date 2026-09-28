@@ -3,6 +3,7 @@ import {NodeType} from "@/lib/types";
 import {databaseConfigured,getInvestigation,getResearchJob,listResearchJobs,listResearchSources,queueResearchJob,saveInvestigation,updateResearchJob} from "@/lib/repository";
 import {guessSeedType,newCase,normalizeSeed,runResearchJob} from "@/lib/research-runner";
 import {aiResearchEnabled} from "@/lib/ai-research";
+import {DEFAULT_DAILY_RESEARCH,currentUser,researchCountToday} from "@/lib/auth";
 
 export const dynamic="force-dynamic";
 export const maxDuration=300;
@@ -37,6 +38,10 @@ export async function POST(req:NextRequest){
   const raw=String(body.seedValue||"").trim();
   if(!raw)return Response.json({error:"Enter something to research: a brand, domain, person, company, trademark, address, phone or email."},{status:400});
   if(raw.length>300)return Response.json({error:"Seed is too long"},{status:400});
+  // Daily research limit per member (owners/admins unlimited). Script tokens have no user and aren't limited.
+  const user=await currentUser();
+  if(user&&user.status!=="approved")return Response.json({error:"Your account isn't approved for research."},{status:403});
+  if(user&&user.role==="member"){const limit=user.daily_research_limit??DEFAULT_DAILY_RESEARCH;if(await researchCountToday(user.id)>=limit)return Response.json({error:`You've used today's ${limit} research runs. The limit resets at midnight UTC; an admin can raise it.`},{status:429})}
   const seedType:NodeType=TYPES.includes(body.seedType)?body.seedType:guessSeedType(raw);
   const seedValue=normalizeSeed(raw,seedType);
   let investigationId:string=body.investigationId||"";
@@ -48,7 +53,7 @@ export async function POST(req:NextRequest){
    await saveInvestigation(created);
    investigationId=created.id;
   }
-  const job=await queueResearchJob({investigationId,seedEntityId:body.seedEntityId||(created?created.id+":seed":null),seedValue,seedType,maxDepth:body.maxDepth});
+  const job=await queueResearchJob({investigationId,seedEntityId:body.seedEntityId||(created?created.id+":seed":null),seedValue,seedType,maxDepth:body.maxDepth,userId:user?.id||null});
   after(()=>runResearchJob(job));
   return Response.json({job,investigationId,case:created,webResearch:aiResearchEnabled()},{status:202});
  }catch(error){return Response.json({error:error instanceof Error?error.message:"Unable to start research"},{status:500})}

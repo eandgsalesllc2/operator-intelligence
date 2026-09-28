@@ -9,6 +9,7 @@ import ProfilePanel from "./ProfilePanel";
 import CaseHero from "./CaseHero";
 import Portfolio from "./Portfolio";
 import Networks from "./Networks";
+import CommandPalette from "./CommandPalette";
 import MarketingPanel from "./MarketingPanel";
 import Onboarding from "./Onboarding";
 import AccountMenu,{type Me} from "./AccountMenu";
@@ -52,7 +53,30 @@ export default function Dashboard(){
  const [db,setDb]=useState(false),[webResearch,setWebResearch]=useState<boolean|null>(null),[loading,setLoading]=useState(true);
  const [jobs,setJobs]=useState<Record<string,Job>>({}),[notice,setNotice]=useState("");
  const polls=useRef<Record<string,number>>({});
- const [me,setMe]=useState<Me|null>(null),[tour,setTour]=useState(false),[view,setView]=useState<"portfolio"|"networks"|"case">("portfolio");
+ const [me,setMe]=useState<Me|null>(null),[tour,setTour]=useState(false),[view,setView]=useState<"portfolio"|"networks"|"case">("portfolio"),[cmd,setCmd]=useState<string|null>(null);
+ useEffect(()=>{const k=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setCmd(c=>c===null?"":null)}};window.addEventListener("keydown",k);return()=>window.removeEventListener("keydown",k)},[]);
+ // ---- URL <-> view: "/" case files, "/networks", "/case/<id>?tab=…" (shareable, Back/Forward work) ----
+ const TABS=["graph","evidence","timeline","profile","marketing"];
+ const fromUrl=useRef(false);
+ const applyUrl=useCallback(()=>{
+  const {pathname,search}=window.location;const m=/^\/case\/([^/]+)/.exec(pathname);const t=new URLSearchParams(search).get("tab");
+  fromUrl.current=true;
+  if(m){setCaseId(decodeURIComponent(m[1]));setView("case");setTab(t&&TABS.includes(t)?t:"graph")}
+  else if(pathname.startsWith("/networks"))setView("networks");
+  else setView("portfolio");
+  setPick(null);
+  setTimeout(()=>{fromUrl.current=false},0); // if nothing changed, don't swallow the next real navigation
+ },[]);// eslint-disable-line react-hooks/exhaustive-deps
+ useEffect(()=>{applyUrl();const on=()=>applyUrl();window.addEventListener("popstate",on);return()=>window.removeEventListener("popstate",on)},[applyUrl]);
+ const urlReady=useRef(false);
+ useEffect(()=>{
+  const want=view==="case"?`/case/${encodeURIComponent(caseId)}${tab!=="graph"?`?tab=${tab}`:""}`:view==="networks"?"/networks":"/";
+  if(!urlReady.current){urlReady.current=true;return} // first render still holds defaults; the URL is the source of truth
+  if(fromUrl.current){fromUrl.current=false;return}   // state came from the URL (load or Back/Forward): don't write it back
+  const now=window.location.pathname+window.location.search;
+  if(now!==want)window.history.pushState(null,"",want);
+ },[view,caseId,tab]);
+ useEffect(()=>{const x=allCases.find(y=>y.id===caseId);document.title=view==="case"&&x?`${x.name} · BrandTracer`:view==="networks"?"Networks · BrandTracer":"BrandTracer"},[view,caseId,allCases]);
  useEffect(()=>{
   if(new URLSearchParams(window.location.search).get("tour")==="1")setTour(true);
   fetch("/api/auth/me").then(r=>{if(r.status===401){window.location.href="/login";return null}return r.ok?r.json():null}).then(d=>{if(d?.user){setMe(d.user);if(!d.user.onboarded_at)setTour(true)}}).catch(()=>{});
@@ -81,18 +105,6 @@ export default function Dashboard(){
   const last=(v:string)=>v===UNCATEGORIZED?2:v==="Other"?1:0;
   return [...vs.entries()].map(([v,m])=>({v,n:[...m.values()].reduce((s,l)=>s+l.length,0),cats:[...m.entries()].sort((a,b)=>b[1].length-a[1].length||labelOf(a[0]).localeCompare(labelOf(b[0]))).map(([k,l])=>({k,items:[...l].sort((a,b)=>(b.metrics?.monthlyVisits||0)-(a.metrics?.monthlyVisits||0)||a.name.localeCompare(b.name))}))})).sort((a,b)=>last(a.v)-last(b.v)||b.n-a.n||a.v.localeCompare(b.v));
  },[sideCases]);
- const matches=useMemo(()=>{
-  const t=q.trim().toLowerCase();if(t.length<2)return [];
-  const out:{c:Case;why:string}[]=[];
-  for(const x of allCases){
-   if((x.name+" "+x.domain).toLowerCase().includes(t)){out.push({c:x,why:x.domain||"investigation"});continue}
-   if((x.category||"").toLowerCase().includes(t)){out.push({c:x,why:x.category||""});continue}
-   const n=x.nodes.find(n=>n.label.toLowerCase().includes(t));
-   if(n){out.push({c:x,why:`${n.label} · ${n.type}`});continue}
-   if(x.summary.toLowerCase().includes(t))out.push({c:x,why:"mentioned in summary"});
-  }
-  return out.slice(0,30);
- },[q,allCases]);
 
  useEffect(()=>{const x=allCases.find(y=>y.id===caseId);if(!x)return;const k=x.category||UNCATEGORIZED;setOpenGroups(p=>p.has("v:"+verticalOf(k))&&p.has("c:"+k)?p:new Set([...p,"v:"+verticalOf(k),"c:"+k]))},[caseId,allCases]);
  const toggleGroup=(key:string)=>setOpenGroups(p=>{const n=new Set(p);n.has(key)?n.delete(key):n.add(key);return n});
@@ -155,12 +167,8 @@ export default function Dashboard(){
   {vOpen&&g.cats.map(ct=>{const cOpen=Boolean(sq.trim())||cat===ct.k||openGroups.has("c:"+ct.k);return <div key={ct.k} className="sub"><button className="subHead" aria-expanded={cOpen} onClick={()=>toggleGroup("c:"+ct.k)}>{cOpen?<ChevronDown size={12}/>:<ChevronRight size={12}/>}<span>{labelOf(ct.k)}</span><em>{ct.items.length}</em></button>{cOpen&&ct.items.map(renderCase)}</div>})}</div>})}{!sideCases.length&&<p className="sideEmpty">{loading?"Loading investigations…":`No investigations match "${sq}".`}</p>}</div>
  <div className="sideLabel bottom">SYSTEM</div><div className="mini"><ShieldCheck size={15}/> Evidence standard: strict</div><div className="mini"><Sparkles size={15}/> Web research: {webResearch===null?"checking…":webResearch?"on":"off"}</div>
  {me&&<AccountMenu me={me} onReplay={()=>{setNavOpen(false);setTour(true)}}/>}
- </aside>{tour&&<Onboarding name={me?.full_name} onDone={()=>{setTour(false);setMe(m=>m?{...m,onboarded_at:new Date().toISOString()}:m)}}/>}<section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><nav className="viewSwitch" aria-label="View"><button aria-pressed={view==="portfolio"} className={view==="portfolio"?"on":""} onClick={()=>setView("portfolio")}>Case files</button><button aria-pressed={view==="networks"} className={view==="networks"?"on":""} onClick={()=>setView("networks")}>Networks</button><button aria-pressed={view==="case"} className={view==="case"?"on":""} onClick={()=>setView("case")} title={c.name}>{c.name.length>16?c.name.slice(0,15)+"…":c.name}</button></nav><div className="search"><Search size={17}/><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&q.trim()&&!matches.length)openNew(q.trim())}} placeholder="Search or research a brand, person, company, domain, email…" aria-label="Search investigations"/></div><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
- {q.trim().length>=2&&<div className="results">
-  <button className="researchRow" onClick={()=>openNew(q.trim())}><Sparkles size={15}/><span><b>Research “{q.trim()}”</b><small>Start a new investigation · looks like a {TYPES.find(t=>t.value===guessType(q))?.label.toLowerCase()}</small></span></button>
-  {matches.map(m=><button key={m.c.id} onClick={()=>{openCase(m.c.id);setQ("")}}><b>{m.c.name}</b><span>{m.why}</span></button>)}
-  {!matches.length&&<p className="noMatch">No existing investigation mentions this.</p>}
- </div>}
+ </aside>{cmd!==null&&<CommandPalette initial={cmd} onClose={()=>setCmd(null)} onOpenCase={openCase} onResearch={v=>openNew(v)} local={t=>{const l=t.toLowerCase();const out:{group:"brand"|"entity";label:string;detail:string;caseId:string;caseName:string}[]=[];for(const x of allCases){if((x.name+" "+x.domain).toLowerCase().includes(l))out.push({group:"brand",label:x.name,detail:[x.domain,x.category].filter(Boolean).join(" · "),caseId:x.id,caseName:x.name});else{const n=x.nodes.find(n=>n.id!==x.id+":seed"&&n.label.toLowerCase().includes(l));if(n)out.push({group:"entity",label:n.label,detail:n.type,caseId:x.id,caseName:x.name})}if(out.length>40)break}return out}}/>}{tour&&<Onboarding name={me?.full_name} onDone={()=>{setTour(false);setMe(m=>m?{...m,onboarded_at:new Date().toISOString()}:m)}}/>}<section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><nav className="viewSwitch" aria-label="View"><button aria-pressed={view==="portfolio"} className={view==="portfolio"?"on":""} onClick={()=>setView("portfolio")}>Case files</button><button aria-pressed={view==="networks"} className={view==="networks"?"on":""} onClick={()=>setView("networks")}>Networks</button><button aria-pressed={view==="case"} className={view==="case"?"on":""} onClick={()=>setView("case")} title={c.name}>{c.name.length>16?c.name.slice(0,15)+"…":c.name}</button></nav><button className="search searchBtn" onClick={()=>setCmd("")} aria-label="Search everything (⌘K)"><Search size={17}/><span>Search brands, people, pixel IDs, phones…</span><kbd>⌘K</kbd></button><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
+
  {view==="portfolio"&&<Portfolio cases={sideCases} total={allCases.length} flag={flag} setFlag={setFlag} onOpen={openCase}/>}
  {view==="networks"&&<Networks onOpen={openCase}/>}
  {view==="case"&&<> <div className="content">

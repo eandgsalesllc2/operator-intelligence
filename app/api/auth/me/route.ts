@@ -7,6 +7,6 @@ export async function GET(){
  let user;
  try{user=await getUser(s.uid)}catch{return Response.json({user:null,error:"Account service unavailable"},{status:503})}
  // Signed cookie for an account that no longer exists: clear it so the sign-in page doesn't bounce back here.
- if(!user){await endSession();return Response.json({user:null},{status:401})}
+ if(!user||user.status!=="approved"){await endSession();return Response.json({user:null},{status:401})}
  return Response.json({user});
 }

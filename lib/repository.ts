@@ -1,5 +1,5 @@
 import {Case,Confidence} from "./types";
-import {identifierRows,tagsFor} from "./profile";
+import {KIND_LABEL,identifierRows,tagsFor} from "./profile";
 import {cases as seedCases} from "./data";
 import type {ProviderFinding} from "./providers";
 
@@ -34,7 +34,7 @@ export function databaseConfigured(){return hasDb()}
 
 export async function listResearchJobs(investigationId:string){if(!hasDb())return [];return request("oi_research_jobs?investigation_id=eq."+encodeURIComponent(investigationId)+"&select=*&order=created_at.desc")}
 export async function listResearchSources(investigationId:string){if(!hasDb())return [];return request("oi_sources?investigation_id=eq."+encodeURIComponent(investigationId)+"&select=*&order=retrieved_at.desc")}
-export async function queueResearchJob(input:{investigationId:string;seedEntityId?:string|null;seedValue:string;seedType:string;maxDepth?:number}){const id="job_"+Date.now().toString(36);const rows=await request("oi_research_jobs",{method:"POST",body:JSON.stringify({id,investigation_id:input.investigationId,seed_entity_id:input.seedEntityId||null,seed_value:input.seedValue,seed_type:input.seedType,status:"queued",depth:0,max_depth:Math.max(1,Math.min(input.maxDepth||3,5)),provider:"pending",progress:0,message:"Queued for research",error:""})});return rows[0]}
+export async function queueResearchJob(input:{investigationId:string;seedEntityId?:string|null;seedValue:string;seedType:string;maxDepth?:number;userId?:string|null}){const id="job_"+Date.now().toString(36);const rows=await request("oi_research_jobs",{method:"POST",body:JSON.stringify({id,investigation_id:input.investigationId,...(input.userId?{user_id:input.userId}:{}),seed_entity_id:input.seedEntityId||null,seed_value:input.seedValue,seed_type:input.seedType,status:"queued",depth:0,max_depth:Math.max(1,Math.min(input.maxDepth||3,5)),provider:"pending",progress:0,message:"Queued for research",error:""})});return rows[0]}
 export async function getResearchJob(id:string){if(!hasDb())return null;const rows=await request("oi_research_jobs?id=eq."+encodeURIComponent(id)+"&select=*");return rows[0]||null}
 export async function updateResearchJob(id:string,patch:Record<string,unknown>){const rows=await request("oi_research_jobs?id=eq."+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({...patch,updated_at:new Date().toISOString()})});return rows[0]}
 export async function saveProviderFindings(input:{investigationId:string;jobId:string;provider:string;findings:ProviderFinding[]}){
@@ -115,4 +115,26 @@ export async function retagAll(){
   await request("investigations?id=eq."+encodeURIComponent(r.id),{method:"PATCH",body:JSON.stringify({tags})});changed++;
  }
  return {checked:rows.length,changed};
+}
+
+// ---------- Search across brands, graph entities and the identifier index ----------
+export type SearchHit={group:"brand"|"identifier"|"entity";label:string;detail:string;caseId:string;caseName:string};
+export async function searchAll(q:string):Promise<SearchHit[]>{
+ if(!hasDb())return [];
+ const term=q.trim().toLowerCase().replace(/[*,()"\\]/g," ").replace(/\s+/g," ").slice(0,80);if(term.length<2)return [];
+ const like=encodeURIComponent(`*${term}*`);
+ const [brands,ids,ents]=await Promise.all([
+  request(`investigations?select=id,name,domain,category&or=(name.ilike.${like},domain.ilike.${like})&limit=12`),
+  request(`oi_identifiers?select=investigation_id,kind,value&or=(normalized.ilike.${like},value.ilike.${like})&limit=60`),
+  request(`entities?select=investigation_id,label,type,subtitle&label=ilike.${like}&type=in.(person,company,trademark,email,phone,address,domain)&limit=60`),
+ ]);
+ const need=new Set<string>([...ids.map((r:any)=>r.investigation_id),...ents.map((r:any)=>r.investigation_id)]);
+ const names=new Map<string,string>();
+ if(need.size){const rows=await request(`investigations?select=id,name&id=in.(${[...need].map(x=>`"${x.replace(/"/g,"")}"`).join(",")})`);for(const r of rows)names.set(r.id,r.name)}
+ const out:SearchHit[]=[];const seen=new Set<string>();
+ const push=(h:SearchHit)=>{const k=h.group+"|"+h.label.toLowerCase()+"|"+h.caseId;if(seen.has(k))return;seen.add(k);out.push(h)};
+ for(const b of brands)push({group:"brand",label:b.name,detail:[b.domain,b.category].filter(Boolean).join(" · "),caseId:b.id,caseName:b.name});
+ for(const r of ids)if(names.has(r.investigation_id))push({group:"identifier",label:r.value,detail:(KIND_LABEL[r.kind]||r.kind),caseId:r.investigation_id,caseName:names.get(r.investigation_id)!});
+ for(const e of ents)if(names.has(e.investigation_id))push({group:"entity",label:e.label,detail:`${e.type}${e.subtitle?" · "+e.subtitle:""}`,caseId:e.investigation_id,caseName:names.get(e.investigation_id)!});
+ return out.slice(0,60);
 }
