@@ -265,7 +265,7 @@ button.indexCard{cursor:pointer}button.indexCard:hover{border-color:#b23a26}
 .pfNo{position:absolute;top:-10px;left:14px;background:#d9cbb2;color:#4a3f31;font-family:var(--f-mono);font-size:10.5px;letter-spacing:1.2px;padding:3px 9px;border-radius:3px 3px 0 0}
 .pfStamp{position:absolute;top:12px;right:10px;transform:rotate(-6deg);border:2px solid;font-family:var(--f-mono);font-size:9.5px;letter-spacing:1.2px;padding:3px 6px;border-radius:3px}
 .pfStamp.ok{color:#1f5e46}.pfStamp.warn{color:#8a5a0c}.pfStamp.bad{color:#b23a26}
-.pfCat{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.8px;color:#7a6d5a;text-transform:uppercase;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfCat{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.8px;color:#7a6d5a;text-transform:uppercase;max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pfName{font-family:var(--f-display);font-weight:800;font-size:26px;letter-spacing:-.4px;line-height:1.1;margin-top:4px;overflow-wrap:anywhere}
 .pfDomain{font-family:var(--f-mono);font-size:12px;color:#5c5244}
 .pfNums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;margin-top:10px;border-top:2px solid var(--ink)}
