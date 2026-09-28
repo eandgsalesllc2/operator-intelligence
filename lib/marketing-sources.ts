@@ -13,16 +13,18 @@ type Q=Record<string,string|number|boolean|undefined|(string|number)[]>;
 function qs(q:Q){const u=new URLSearchParams();for(const [k,v] of Object.entries(q)){if(v===undefined||v==="")continue;if(Array.isArray(v))v.forEach(x=>u.append(k,String(x)));else u.set(k,String(v))}const s=u.toString();return s?"?"+s:""}
 // Retries rate limits (429) and server errors with backoff; 404 means "no such brand" and returns null.
 const errors:string[]=[];
+export const trace:string[]=[]; // per-call log for /api/integrations diagnostics
 async function get(base:string,key:string|undefined,path:string,q:Q={}){
  if(!key)throw new Error("not configured");
  for(let attempt=0;;attempt++){
   const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),20000);
   try{
    const r=await fetch(base+path+qs(q),{headers:{"X-API-Key":key,Accept:"application/json"},signal:ctl.signal,cache:"no-store"});
+   trace.push(`${r.status} ${path}${qs(q)}`);
    if(r.status===404)return null;
    if((r.status===429||r.status>=500)&&attempt<3){const wait=Math.min(8000,(+(r.headers.get("retry-after")||0)*1000)||1500*2**attempt);await new Promise(res=>setTimeout(res,wait));continue}
    if(!r.ok){const msg=`${r.status} ${(await r.text()).slice(0,160)}`;errors.push(`${new URL(base).hostname}${path.split("?")[0]}: ${msg}`);throw new Error(msg)}
-   return await r.json();
+   const body=await r.json();const n=body?.data?.items?.length;if(n!=null)trace[trace.length-1]+=` → ${n} items`;return body;
   }catch(e){if(ctl.signal.aborted&&attempt<1)continue;throw e}
   finally{clearTimeout(t)}
  }
@@ -169,7 +171,7 @@ async function fromAtria(domain:string,brandName:string){
 
 // Pulls both sources in parallel. brandName helps Atria find the advertiser (it searches by name).
 export async function pullMarketing(domain:string,brandName:string):Promise<MarketingPull>{
- const reports:SourceReport[]=[];errors.length=0;
+ const reports:SourceReport[]=[];errors.length=0;trace.length=0;
  if(!domain)return {reports};
  const [b,a]=await Promise.all([
   brandsearchEnabled()?fromBrandsearch(domain).catch(e=>({note:"failed: "+(e instanceof Error?e.message:"error"),topCopy:[] as string[]})):Promise.resolve(null),

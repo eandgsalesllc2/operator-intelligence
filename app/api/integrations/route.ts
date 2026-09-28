@@ -1,5 +1,5 @@
 import {NextRequest} from "next/server";
-import {atriaEnabled,brandsearchEnabled,pullMarketing} from "@/lib/marketing-sources";
+import {atriaEnabled,brandsearchEnabled,pullMarketing,trace} from "@/lib/marketing-sources";
 
 export const dynamic="force-dynamic";
 export const maxDuration=120;
@@ -30,7 +30,7 @@ export async function GET(req:NextRequest){
  }
  const r=await pullMarketing(domain,req.nextUrl.searchParams.get("name")||"");
  const m=r.marketing,t=r.metrics;
- return Response.json({...status,reports:r.reports,
+ return Response.json({...status,reports:r.reports,trace:req.nextUrl.searchParams.get("trace")?trace.filter(x=>x.includes("brand-library")):undefined,
   metrics:t&&{monthlyVisits:t.monthlyVisits,aov:t.aov,revenue:t.revenue,bestsellers:t.bestsellers?.length,metaActiveAds:t.metaActiveAds,metaTotalAds:t.metaTotalAds},
   marketing:m&&{pages:m.meta?.pages?.length,personaPages:m.meta?.personaPageCount,topAds:m.meta?.topAds?.length,tiktokPosts:m.tiktok?.posts,instagramPosts:m.instagram?.posts,emails:m.email?.total,
    landing:m.landing&&{advertisers:m.landing.advertisers?.map(a=>`${a.name} (${a.role})`),landingPages:m.landing.landingPages?.slice(0,8).map(l=>`${l.host}${l.path} · ${l.kind} · ${l.activeAds}`),notes:m.landing.notes}}});
