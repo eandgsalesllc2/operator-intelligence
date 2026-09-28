@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import {Case} from "@/lib/types";
 import {KIND_LABEL,STRONG_KINDS,normalizeIdentifier} from "@/lib/profile";
+import SiteLink from "./SiteLink";
 import {Link2,AlertTriangle,ShieldCheck,Building2,Tags,MapPin,Search} from "lucide-react";
 
 type Match={investigation_id:string;name:string;domain:string;category:string;kind:string;value:string;normalized:string};
@@ -40,7 +41,7 @@ export default function ProfilePanel({c,onOpen}:{c:Case;onOpen:(id:string)=>void
    {idRow("Checkout",[id.checkoutVendor?`${id.checkoutVendor} (vendor)`:null,id.checkoutAccount],"checkout_account")}{idRow("Subscriptions",[id.subscriptionApp])}
    {idRow("Payment IDs",id.paymentIds,"payment_id")}{idRow("Amazon sellers",id.amazonSellers,"amazon_seller")}{idRow("Card descriptors",id.cardDescriptors,"card_descriptor")}
    {idRow("Support emails",id.supportEmails,"email")}{idRow("Phones",id.phones,"phone")}
-   {(id.relatedDomains||[]).length>0&&<div className="kv"><span>Related domains</span><div className="chips">{id.relatedDomains!.map((d,i)=><span key={i} className="chipTag mono">{d.domain} <em>{d.relation}{d.confidence?` · ${d.confidence}`:""}</em></span>)}</div></div>}
+   {(id.relatedDomains||[]).length>0&&<div className="kv"><span>Related domains</span><div className="chips">{id.relatedDomains!.map((d,i)=><span key={i} className="chipTag mono"><SiteLink domain={d.domain}/> <em>{d.relation}{d.confidence?` · ${d.confidence}`:""}</em></span>)}</div></div>}
   </section>
 
   {(p.entities||[]).length>0&&<section className="psec"><h4><Building2 size={14}/> Companies</h4><div className="tableWrap"><table className="ptable"><thead><tr><th>Company</th><th>Role</th><th>Jurisdiction · file</th><th>Formed</th><th>Status</th><th>Officers</th></tr></thead><tbody>{p.entities!.map((e,i)=><tr key={i}><td><b>{e.name}</b>{e.confidence?<span className="dim small"> · {e.confidence}</span>:null}{isUrl(e.source)?<a className="small" href={e.source!} target="_blank" rel="noopener noreferrer"> source</a>:null}</td><td>{e.role||"—"}</td><td>{[e.jurisdiction,e.fileNumber].filter(Boolean).join(" · ")||"—"}</td><td>{e.formed||"—"}</td><td className={/dissolved|suspended/.test(e.status||"")?"bad":""}>{e.status||"—"}</td><td>{(e.officers||[]).map(o=>`${o.name}${o.role?` (${o.role})`:""}`).join(", ")||"—"}</td></tr>)}</tbody></table></div></section>}

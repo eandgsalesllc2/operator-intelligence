@@ -3,6 +3,7 @@ import {useEffect,useState} from "react";
 import {Loader2,RefreshCw,Star,StarOff} from "lucide-react";
 import {Case} from "@/lib/types";
 import {compact} from "@/lib/metrics";
+import SiteLink from "./SiteLink";
 
 export type WatchChange={id:string;investigation_id:string;detected_at:string;kind:string;severity:"info"|"notable"|"major";title:string;detail?:string|null};
 export type WatchData={items:{investigation_id:string;created_at:string;lastChecked:string|null}[];changes:WatchChange[];unread:number;seenAt:string|null;weeklyScheduled:boolean};
@@ -30,7 +31,7 @@ export default function Watchlist({data,cases,onOpen,onToggle,onChecked,onSeen}:
    <section className="chFeed"><h2>What changed</h2>{data.changes.length?data.changes.slice(0,60).map(ch=><ChangeItem key={ch.id} ch={ch} name={byId.get(ch.investigation_id)?.name} unread={new Date(ch.detected_at).getTime()>seen} onOpen={()=>onOpen(ch.investigation_id)}/>):<p className="dim">No changes recorded yet. The first check compares each brand against what&apos;s already on file.</p>}</section>
    <section className="watchList"><h2>Watched brands</h2>{data.items.map(it=>{const c=byId.get(it.investigation_id);const n=data.changes.filter(x=>x.investigation_id===it.investigation_id).length;
     return <div key={it.investigation_id} className="watchRow">
-     <button className="watchMain" onClick={()=>onOpen(it.investigation_id)}><b>{c?.name||it.investigation_id}</b><span>{c?.domain||""}{c?.metrics?.monthlyVisits!=null?` · ${compact(c.metrics.monthlyVisits)} visits/mo`:""}</span></button>
+     <div className="watchMain"><button className="watchName" onClick={()=>onOpen(it.investigation_id)}>{c?.name||it.investigation_id}</button><span>{c?.domain?<SiteLink domain={c.domain}/>:null}{c?.metrics?.monthlyVisits!=null?` · ${compact(c.metrics.monthlyVisits)} visits/mo`:""}</span></div>
      <span className="watchMeta">{it.lastChecked?`checked ${ago(it.lastChecked)}`:"not checked yet"}<br/>{n} change{n===1?"":"s"}</span>
      <button className="watchBtn" disabled={busy===it.investigation_id} onClick={()=>check(it.investigation_id)}>{busy===it.investigation_id?<Loader2 size={14} className="spin"/>:<RefreshCw size={14}/>} Check now</button>
      <button className="watchBtn ghost" onClick={()=>onToggle(it.investigation_id,false)} aria-label={`Stop watching ${c?.name||""}`}><StarOff size={14}/> Unwatch</button>

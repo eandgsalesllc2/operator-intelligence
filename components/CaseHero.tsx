@@ -5,6 +5,7 @@ import {CATEGORIES,labelOf,verticalOf} from "@/lib/categories";
 import {MRR_METHOD,REVENUE_METHOD,compact,currencySymbol} from "@/lib/metrics";
 import {KIND_LABEL,STRONG_KINDS} from "@/lib/profile";
 import {ChangeItem,type WatchChange} from "./Watchlist";
+import SiteLink from "./SiteLink";
 
 // The top of a brand page, styled as a case file: stamp, subject, headline numbers and the key findings.
 type Match={investigation_id:string;name:string;kind:string;value:string};
@@ -57,7 +58,7 @@ export default function CaseHero({c,onCategory,onFilterVertical,onOpen}:{c:Case;
    <label className="subjCat"><span className="sr">Category</span><select value={c.category||""} onChange={e=>onCategory(e.target.value)}><option value="">Uncategorized</option>{[...new Set(CATEGORIES.map(verticalOf))].map(v=><optgroup key={v} label={v}>{CATEGORIES.filter(k=>verticalOf(k)===v).map(k=><option key={k} value={k}>{labelOf(k)}</option>)}</optgroup>)}</select></label>
   </div>
   <h1 className="dossierName">{c.name}</h1>
-  <div className="dossierDomain">{c.domain||"no domain on file"} <span>· {c.status}</span></div>
+  <div className="dossierDomain">{c.domain?<SiteLink domain={c.domain}/>:"no domain on file"} <span>· {c.status}</span></div>
   {summary&&<p className="dossierSummary">{summary}</p>}
   {met&&(met.monthlyVisits!=null||met.revenue)?<div className="fields">
    <div><small>MONTHLY VISITS</small><b>{compact(met.monthlyVisits)}</b><em title={met.asOf?`As of ${met.asOf}`:undefined}>BrandSearch</em></div>

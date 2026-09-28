@@ -4,6 +4,7 @@ import {Case} from "@/lib/types";
 import {labelOf,verticalOf} from "@/lib/categories";
 import {compact,currencySymbol} from "@/lib/metrics";
 import {StarButton} from "./Watchlist";
+import SiteLink from "./SiteLink";
 
 // Every investigation as a case-file card. Uses the sidebar's category/flag/search filters, adds sorting and quick flags.
 const OWN:Record<string,{t:string;tone:string}>={identified:{t:"OWNER IDENTIFIED",tone:"ok"},legal_entity_only:{t:"LEGAL ENTITY ONLY",tone:"warn"},operator_unknown:{t:"OPERATOR UNKNOWN",tone:"bad"},contested:{t:"CONTESTED",tone:"bad"}};
@@ -29,14 +30,14 @@ export default function Portfolio({cases,total,flag,setFlag,onOpen,watched,onTog
    const own=(x.tags||[]).find(t=>t.startsWith("ownership:"))?.slice(10);const o=own?OWN[own]:null;const m=x.metrics;const cur=currencySymbol(m?.currency);
    const net=(x.tags||[]).find(t=>t.startsWith("network:"))?.slice(8);
    const flags=[(x.tags||[]).includes("persona-ads")&&"Persona ads",(x.tags||[]).includes("subscription")&&"Subscription",(x.tags||[]).includes("lawsuit")&&"Lawsuit",(x.tags||[]).includes("regulatory")&&"Regulatory",(x.tags||[]).some(t=>/^bbb:[DF]/.test(t))&&"BBB D/F"].filter(Boolean) as string[];
-   return <div key={x.id} className="pfWrap">{onToggleWatch&&<StarButton compactMode on={!!watched?.has(x.id)} onClick={()=>onToggleWatch(x.id,!watched?.has(x.id))}/>}<button className="pfCard" onClick={()=>onOpen(x.id)}>
+   return <div key={x.id} className="pfWrap">{onToggleWatch&&<StarButton compactMode on={!!watched?.has(x.id)} onClick={()=>onToggleWatch(x.id,!watched?.has(x.id))}/>}<div className="pfCard"><button className="pfHit" onClick={()=>onOpen(x.id)} aria-label={`Open ${x.name}`}/>
     <span className="pfNo">№ {caseNo(x.id)}</span>
     {o&&<span className={"pfStamp "+o.tone}>{o.t}</span>}
     <span className="pfCat">{x.category?`${verticalOf(x.category)} › ${labelOf(x.category)}`:"Uncategorized"}</span>
     <span className="pfName">{x.name}</span>
-    <span className="pfDomain">{x.domain||"—"}</span>
+    {x.domain?<SiteLink className="pfDomain" domain={x.domain}/>:<span className="pfDomain">—</span>}
     <span className="pfNums"><span><small>VISITS</small><b>{m?.monthlyVisits!=null?compact(m.monthlyVisits):"—"}</b></span><span><small>EST. REV</small><b>{m?.revenue?compact(m.revenue.mid,cur):"—"}</b></span><span><small>ADS</small><b>{m?.metaActiveAds!=null?compact(m.metaActiveAds):"—"}</b></span></span>
     {(net||flags.length>0)&&<span className="pfFlags">{net&&<em className="net">{net}</em>}{flags.map(f=><em key={f}>{f}</em>)}</span>}
-   </button></div>})}</div>:<p className="pfEmpty">No brands match these filters.</p>}
+   </div></div>})}</div>:<p className="pfEmpty">No brands match these filters.</p>}
  </div>;
 }

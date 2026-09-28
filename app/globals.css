@@ -375,3 +375,13 @@ button.chItem{cursor:pointer}button.chItem:hover{background:#221d17}
 .changedBlock .chItem{color:var(--ink);border-top:1px solid #e3d6bf;padding:9px 12px}.changedBlock .chItem:first-child{border-top:0}
 .changedBlock .chDetail{color:#5c5244}.changedBlock time{color:#7a6d5a}
 @media (max-width:760px){.watchRow{grid-template-columns:minmax(0,1fr) auto}.watchMeta{display:none}.viewSwitch button{padding:6px 7px}}
+/* clickable domains */
+.siteLink{display:inline-flex;align-items:center;gap:4px;color:inherit;text-decoration:underline;text-decoration-color:rgba(194,65,45,.45);text-underline-offset:3px;overflow-wrap:anywhere}
+.siteLink:hover{color:#a3321f;text-decoration-color:currentColor}.siteLink svg{flex:none;opacity:.7}
+.shell .siteLink:hover,.drawer .siteLink:hover,.watchMain .siteLink:hover,.chips .siteLink:hover{color:#e0a07a}
+.pfHit{position:absolute;inset:0;z-index:1;border:0;background:transparent;cursor:pointer;border-radius:3px}
+.pfHit:focus-visible{outline:3px solid var(--rust);outline-offset:3px}
+.pfCard .siteLink{position:relative;z-index:2}
+.pfCard:has(.pfHit:hover){transform:translateY(-3px) rotate(-.4deg);box-shadow:0 14px 30px rgba(0,0,0,.45)}
+.watchName{border:0;background:transparent;color:#efe6d6;font:inherit;font-family:var(--f-display);font-size:17px;font-weight:700;text-align:left;padding:0;cursor:pointer}.watchName:hover{color:#fff7ee;text-decoration:underline}
+.drawerSite{margin:4px 0 8px;font-size:13px;color:#e0a07a}
