@@ -90,7 +90,9 @@ export function tagsFor(p?:Profile|null,m?:Marketing|null,network?:string|null):
  if((p?.reputation?.regulatory?.length||0)>0)t.add("regulatory");
  const net=network||p?.network?.name||p?.network?.parent;if(net)t.add("network:"+net);
  const risks=(p?.reputation?.risks||[]).join(" ").toLowerCase();
- if((m?.meta?.personaPageCount||0)>0||/persona|doctor/.test(risks))t.add("persona-ads");
+ const pages=m?.meta?.pages||[];const personaActive=pages.filter(x=>x.persona).reduce((s,x)=>s+(x.activeAds||0),0);const allActive=pages.reduce((s,x)=>s+(x.activeAds||0),0);
+ const personaPagesLive=pages.filter(x=>x.persona&&(x.activeAds||0)>0).length;
+ if((allActive>0&&personaActive/allActive>=0.25)||personaPagesLive>=3||/persona (ad )?pages?|fake doctor|doctor persona|persona-driven/.test(risks))t.add("persona-ads");
  if(/impostor|clone/.test(risks))t.add("clones");
  if(/jsdeliver/.test(risks))t.add("lookalike-script");
  if(m?.strategy?.scale)t.add("scale:"+m.strategy.scale);

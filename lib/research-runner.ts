@@ -157,6 +157,8 @@ export async function runResearchJob(job:any){
     if(r.findings.length){await saveProviderFindings({investigationId:c.id,jobId:job.id,provider:claudeResearch.name,findings:r.findings as ProviderFinding[]});findingsTotal+=r.findings.length}
     merged=mergeDraft(merged,r.draft,seedNode.id);
     merged={...merged,profile:mergeProfile(merged.profile||{},r.draft.profile)};
+    // A case created from a bare domain takes the brand name research found (e.g. ryzesuperfoods.com → RYZE).
+    if(/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(merged.name)){const b=r.draft.nodes.find(n=>n.type==="brand"&&(n.confidence==="confirmed"||n.confidence==="strong")&&!/\.[a-z]{2,}$/i.test(n.label));if(b)merged={...merged,name:b.label.replace(/\s*\(.*\)$/,"").slice(0,80)}}
     // The brand sells on a different domain than the one searched (e.g. rhode.com → rhodeskin.com): scan the real store too.
     const store=r.draft.storeDomain?cleanDomain(r.draft.storeDomain):"";
     if(store&&isPublicHostname(store)&&store!==domain&&!store.endsWith("."+domain)){

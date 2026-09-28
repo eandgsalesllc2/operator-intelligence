@@ -103,3 +103,16 @@ export async function networkClusters():Promise<NetworkCluster[]>{
  }
  return out.sort((a,b)=>Number(b.hard)-Number(a.hard)||b.members.length-a.members.length||b.visits-a.visits);
 }
+
+// Recompute filter tags for every investigation (after the tag rules change). Only the tags column is written.
+export async function retagAll(){
+ const rows=await fetchAll("investigations?select=id,summary,profile,marketing,metrics,tags");
+ let changed=0;
+ for(const r of rows){
+  if(!r.profile&&!r.marketing)continue;
+  const tags=[...tagsFor(r.profile,r.marketing,/^\[(.+?)\]/.exec(r.summary||"")?.[1]),...(r.metrics?.subscription?.focused?["subscription"]:[])];
+  if(JSON.stringify([...tags].sort())===JSON.stringify([...(r.tags||[])].sort()))continue;
+  await request("investigations?id=eq."+encodeURIComponent(r.id),{method:"PATCH",body:JSON.stringify({tags})});changed++;
+ }
+ return {checked:rows.length,changed};
+}

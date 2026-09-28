@@ -70,7 +70,9 @@ export default function Dashboard(){
  const c=allCases.find(x=>x.id===caseId)||allCases[0];
  const catCounts=useMemo(()=>{const m=new Map<string,number>();for(const x of allCases){const k=x.category||UNCATEGORIZED;m.set(k,(m.get(k)||0)+1)}return m},[allCases]);
  const verticals=useMemo(()=>{const m=new Map<string,string[]>();for(const k of catCounts.keys()){const v=verticalOf(k);if(!m.has(v))m.set(v,[]);m.get(v)!.push(k)}return [...m.entries()].sort((a,b)=>a[0]===UNCATEGORIZED?1:b[0]===UNCATEGORIZED?-1:a[0].localeCompare(b[0])).map(([v,ks])=>({v,ks:ks.sort(),n:ks.reduce((s,k)=>s+(catCounts.get(k)||0),0)}))},[catCounts]);
- const sideCases=useMemo(()=>{const t=sq.trim().toLowerCase();return allCases.filter(x=>{const k=x.category||UNCATEGORIZED;if(cat!=="all"&&!(cat.startsWith("v:")?verticalOf(k)===cat.slice(2):k===cat))return false;if(flag!=="all"&&!(x.tags||[]).some(t=>flag.endsWith("*")?t.startsWith(flag.slice(0,-1)):t===flag))return false;return !t||(x.name+" "+x.domain+" "+k).toLowerCase().includes(t)})},[sq,cat,flag,allCases]);
+ // Networks shared by 2+ brands; a brand whose only "network" is itself doesn't count as being in one.
+ const sharedNets=useMemo(()=>{const n=new Map<string,number>();for(const x of allCases)for(const t of x.tags||[])if(t.startsWith("network:"))n.set(t.toLowerCase(),(n.get(t.toLowerCase())||0)+1);return new Set([...n].filter(([,v])=>v>1).map(([k])=>k))},[allCases]);
+ const sideCases=useMemo(()=>{const t=sq.trim().toLowerCase();return allCases.filter(x=>{const k=x.category||UNCATEGORIZED;if(cat!=="all"&&!(cat.startsWith("v:")?verticalOf(k)===cat.slice(2):k===cat))return false;if(flag==="network:*"){if(!(x.tags||[]).some(t=>sharedNets.has(t.toLowerCase())))return false}else if(flag!=="all"&&!(x.tags||[]).some(t=>flag.endsWith("*")?t.startsWith(flag.slice(0,-1)):t===flag))return false;return !t||(x.name+" "+x.domain+" "+k).toLowerCase().includes(t)})},[sq,cat,flag,allCases,sharedNets]);
  // Sidebar tree: vertical → category → investigations.
  const tree=useMemo(()=>{
   const vs=new Map<string,Map<string,Case[]>>();

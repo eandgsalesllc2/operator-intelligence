@@ -41,7 +41,7 @@ function findings(c:Case,matches:Match[]):Finding[]{
 export default function CaseHero({c,onCategory,onFilterVertical,onOpen}:{c:Case;onCategory:(k:string)=>void;onFilterVertical:(v:string)=>void;onOpen:(id:string)=>void}){
  const [matches,setMatches]=useState<Match[]>([]);
  useEffect(()=>{setMatches([]);if(!c.profile&&!c.marketing)return;let live=true;fetch("/api/identifiers?investigationId="+encodeURIComponent(c.id)).then(r=>r.ok?r.json():null).then(d=>{if(live)setMatches(d?.matches||[])}).catch(()=>{});return()=>{live=false}},[c.id,c.profile,c.marketing]);
- const own=c.profile?.research?.ownershipStatus;const stamp=own?STAMP[own]:{text:"NOT YET\nASSESSED",tone:"lead"};
+ const own=c.profile?.research?.ownershipStatus??(c.tags||[]).find(t=>t.startsWith("ownership:"))?.slice(10);const stamp=own?STAMP[own]:{text:"NOT YET\nASSESSED",tone:"lead"};
  const met=c.metrics;const cur=currencySymbol(met?.currency);
  const summary=(c.summary||"").replace(/^\[[^\]]+\]\s*/,"");
  const confirmed=c.nodes.filter(n=>n.confidence==="confirmed").length,strong=c.nodes.filter(n=>n.confidence==="strong").length;
