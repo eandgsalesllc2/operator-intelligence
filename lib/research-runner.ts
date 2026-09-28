@@ -32,7 +32,7 @@ export function guessSeedType(value:string):NodeType{
 
 export function newCase(seedValue:string,seedType:NodeType,name?:string):Case{
  const id=slugify(name||seedValue)+"-"+Date.now().toString(36);
- const domain=seedType==="domain"?seedValue:"";
+ const domain=seedType==="domain"?seedValue:(/\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i.exec(seedValue)?.[1]||"").toLowerCase().replace(/^www\./,"");
  const label=name?.trim()||seedValue;
  const today=new Date().toISOString().slice(0,10);
  return {id,name:label,domain,status:"Research running",summary:`Investigation seeded from ${seedType}: ${seedValue}.`,nodes:[{id:id+":seed",label:seedValue,type:seedType,subtitle:"Investigation seed",x:380,y:230,confidence:"lead",details:["Research seed"]}],edges:[],evidence:[],timeline:[{date:today,title:"Investigation created",body:`Seeded from ${seedType}: ${seedValue}.`}],openQuestions:[]};
@@ -42,6 +42,10 @@ function domainFor(c:Case,seedValue:string,seedType:NodeType){
  if(seedType==="domain")return cleanDomain(seedValue);
  if(seedType==="email"&&!FREE_MAIL.test(seedValue))return seedValue.split("@")[1].toLowerCase();
  if(seedType==="brand"&&c.domain&&c.name.toLowerCase()===seedValue.toLowerCase())return cleanDomain(c.domain);
+ // "Kaori (try-kaori.com)" — a brand or company label with its domain written in it
+ const inLabel=/\b((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i.exec(seedValue)?.[1];
+ if((seedType==="brand"||seedType==="company")&&inLabel&&isPublicHostname(cleanDomain(inLabel)))return cleanDomain(inLabel);
+ if(c.domain)return cleanDomain(c.domain);
  return "";
 }
 
