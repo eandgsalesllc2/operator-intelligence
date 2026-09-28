@@ -8,8 +8,8 @@ const scrypt=promisify(scryptCb) as (p:string,s:Buffer,n:number,o:{N:number;r:nu
 const PARAMS={N:16384,r:8,p:1,maxmem:64*1024*1024};
 const MAX_FAILED=5, LOCK_MINUTES=15;
 
-export type User={id:string;email:string;full_name:string;company:string;job_role:string;use_case:string;onboarded_at:string|null;created_at:string;status:"pending"|"approved"|"rejected";role:"owner"|"admin"|"member";daily_research_limit:number|null;last_login_at?:string|null};
-const PUBLIC_FIELDS="id,email,full_name,company,job_role,use_case,onboarded_at,created_at,status,role,daily_research_limit,last_login_at";
+export type User={id:string;email:string;full_name:string;company:string;job_role:string;use_case:string;onboarded_at:string|null;created_at:string;status:"pending"|"approved"|"rejected";role:"owner"|"admin"|"member";daily_research_limit:number|null;last_login_at?:string|null;watch_seen_at?:string|null};
+const PUBLIC_FIELDS="id,email,full_name,company,job_role,use_case,onboarded_at,created_at,status,role,daily_research_limit,last_login_at,watch_seen_at";
 export const isAdmin=(u?:User|null)=>!!u&&u.status==="approved"&&(u.role==="owner"||u.role==="admin");
 export const DEFAULT_DAILY_RESEARCH=Number(process.env.RESEARCH_DAILY_LIMIT||20);
 

@@ -4,6 +4,7 @@ import {Case} from "@/lib/types";
 import {CATEGORIES,labelOf,verticalOf} from "@/lib/categories";
 import {MRR_METHOD,REVENUE_METHOD,compact,currencySymbol} from "@/lib/metrics";
 import {KIND_LABEL,STRONG_KINDS} from "@/lib/profile";
+import {ChangeItem,type WatchChange} from "./Watchlist";
 
 // The top of a brand page, styled as a case file: stamp, subject, headline numbers and the key findings.
 type Match={investigation_id:string;name:string;kind:string;value:string};
@@ -39,7 +40,8 @@ function findings(c:Case,matches:Match[]):Finding[]{
 }
 
 export default function CaseHero({c,onCategory,onFilterVertical,onOpen}:{c:Case;onCategory:(k:string)=>void;onFilterVertical:(v:string)=>void;onOpen:(id:string)=>void}){
- const [matches,setMatches]=useState<Match[]>([]);
+ const [matches,setMatches]=useState<Match[]>([]);const [changes,setChanges]=useState<{changes:WatchChange[];lastChecked:string|null}|null>(null);
+ useEffect(()=>{setChanges(null);let live=true;fetch("/api/changes?investigationId="+encodeURIComponent(c.id)).then(r=>r.ok?r.json():null).then(d=>{if(live&&d)setChanges(d)}).catch(()=>{});return()=>{live=false}},[c.id,c.metrics]);
  useEffect(()=>{setMatches([]);if(!c.profile&&!c.marketing)return;let live=true;fetch("/api/identifiers?investigationId="+encodeURIComponent(c.id)).then(r=>r.ok?r.json():null).then(d=>{if(live)setMatches(d?.matches||[])}).catch(()=>{});return()=>{live=false}},[c.id,c.profile,c.marketing]);
  const own=c.profile?.research?.ownershipStatus??(c.tags||[]).find(t=>t.startsWith("ownership:"))?.slice(10);const stamp=own?STAMP[own]:{text:"NOT YET\nASSESSED",tone:"lead"};
  const met=c.metrics;const cur=currencySymbol(met?.currency);
@@ -65,6 +67,7 @@ export default function CaseHero({c,onCategory,onFilterVertical,onOpen}:{c:Case;
    <div><small>ACTIVE META ADS</small><b>{met.metaActiveAds!=null?met.metaActiveAds.toLocaleString():"—"}</b><em>{met.metaTotalAds!=null?`${met.metaTotalAds.toLocaleString()} all-time`:""}</em></div>
   </div>:<div className="fields empty"><span>No traffic or revenue on file yet — run research to pull BrandSearch and Atria.</span></div>}
   <div className="ledger">{c.nodes.length} ENTITIES · {c.edges.length} LINKS · <span className="ok">{confirmed} CONFIRMED</span> · <span className="strong">{strong} STRONG</span> · {c.evidence.length} SOURCES</div>
+  {changes&&changes.changes.length>0&&<div className="findings changedBlock"><div className="findingsHead">WHAT CHANGED{changes.lastChecked?` · LAST CHECKED ${new Date(changes.lastChecked).toLocaleDateString(undefined,{month:"short",day:"numeric"}).toUpperCase()}`:""}</div><div className="chList">{changes.changes.slice(0,5).map(ch=><ChangeItem key={ch.id} ch={ch}/>)}</div></div>}
   {f.length>0&&<div className="findings"><div className="findingsHead">KEY FINDINGS</div><div className="cards">{f.map((x,i)=>{const inner=<><div className="cardTop"><span className={"tag "+x.tone}>{x.tag}</span><span className="src">{x.source}</span></div><div className="cardTitle">{x.title}</div>{x.detail&&<div className="cardDetail">{x.detail}</div>}</>;return x.open?<button key={i} className="indexCard" style={{transform:`rotate(${[-0.6,0.5,0.4,-0.4][i%4]}deg)`}} onClick={()=>onOpen(x.open!)}>{inner}</button>:<article key={i} className="indexCard" style={{transform:`rotate(${[-0.6,0.5,0.4,-0.4][i%4]}deg)`}}>{inner}</article>})}</div></div>}
  </section>;
 }

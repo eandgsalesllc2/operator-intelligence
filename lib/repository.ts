@@ -138,3 +138,12 @@ export async function searchAll(q:string):Promise<SearchHit[]>{
  for(const e of ents)if(names.has(e.investigation_id))push({group:"entity",label:e.label,detail:`${e.type}${e.subtitle?" · "+e.subtitle:""}`,caseId:e.investigation_id,caseName:names.get(e.investigation_id)!});
  return out.slice(0,60);
 }
+
+// Update only a case's metrics/marketing (and the tags + identifier index that depend on them) — used by watchlist checks.
+export async function refreshMarketing(c:Case){
+ const tags=[...tagsFor(c.profile,c.marketing,/^\[(.+?)\]/.exec(c.summary||"")?.[1]),...(c.metrics?.subscription?.focused?["subscription"]:[])];
+ await request("investigations?id=eq."+encodeURIComponent(c.id),{method:"PATCH",body:JSON.stringify({metrics:c.metrics||{},marketing:c.marketing||{},monthly_visits:c.metrics?.monthlyVisits??null,tags,updated_at:new Date().toISOString()})});
+ await request("oi_identifiers?investigation_id=eq."+encodeURIComponent(c.id),{method:"DELETE"});
+ const rows=identifierRows(c.profile,c.marketing,c.domain);
+ if(rows.length)await request("oi_identifiers",{method:"POST",body:JSON.stringify(rows.map(r=>({...r,investigation_id:c.id})))});
+}

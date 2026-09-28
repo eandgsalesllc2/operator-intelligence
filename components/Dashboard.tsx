@@ -10,6 +10,7 @@ import CaseHero from "./CaseHero";
 import Portfolio from "./Portfolio";
 import Networks from "./Networks";
 import CommandPalette from "./CommandPalette";
+import Watchlist,{StarButton,type WatchData} from "./Watchlist";
 import MarketingPanel from "./MarketingPanel";
 import Onboarding from "./Onboarding";
 import AccountMenu,{type Me} from "./AccountMenu";
@@ -53,16 +54,27 @@ export default function Dashboard(){
  const [db,setDb]=useState(false),[webResearch,setWebResearch]=useState<boolean|null>(null),[loading,setLoading]=useState(true);
  const [jobs,setJobs]=useState<Record<string,Job>>({}),[notice,setNotice]=useState("");
  const polls=useRef<Record<string,number>>({});
- const [me,setMe]=useState<Me|null>(null),[tour,setTour]=useState(false),[view,setView]=useState<"portfolio"|"networks"|"case">("portfolio"),[cmd,setCmd]=useState<string|null>(null);
+ const [me,setMe]=useState<Me|null>(null),[tour,setTour]=useState(false),[view,setView]=useState<"portfolio"|"networks"|"watchlist"|"case">("portfolio"),[cmd,setCmd]=useState<string|null>(null);
  useEffect(()=>{const k=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setCmd(c=>c===null?"":null)}};window.addEventListener("keydown",k);return()=>window.removeEventListener("keydown",k)},[]);
  // ---- URL <-> view: "/" case files, "/networks", "/case/<id>?tab=…" (shareable, Back/Forward work) ----
  const TABS=["graph","evidence","timeline","profile","marketing"];
+ const [watch,setWatch]=useState<WatchData|null>(null);
+ const loadWatch=useCallback(()=>fetch("/api/watchlist",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(d&&!d.error)setWatch(d)}).catch(()=>{}),[]);
+ useEffect(()=>{loadWatch()},[loadWatch]);
+ const watched=useMemo(()=>new Set((watch?.items||[]).map(i=>i.investigation_id)),[watch]);
+ const toggleWatch=useCallback(async(id:string,on:boolean)=>{
+  setWatch(w=>w?{...w,items:on?[{investigation_id:id,created_at:new Date().toISOString(),lastChecked:null},...w.items.filter(i=>i.investigation_id!==id)]:w.items.filter(i=>i.investigation_id!==id)}:w);
+  const r=await fetch("/api/watchlist",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({investigationId:id,watch:on})});
+  if(!r.ok)setNotice("Couldn't update your watchlist.");loadWatch();
+ },[loadWatch]);
+ const markWatchSeen=useCallback(()=>{fetch("/api/watchlist/seen",{method:"POST"}).then(()=>setWatch(w=>w?{...w,unread:0,seenAt:new Date().toISOString()}:w)).catch(()=>{})},[]);
  const fromUrl=useRef(false);
  const applyUrl=useCallback(()=>{
   const {pathname,search}=window.location;const m=/^\/case\/([^/]+)/.exec(pathname);const t=new URLSearchParams(search).get("tab");
   fromUrl.current=true;
   if(m){setCaseId(decodeURIComponent(m[1]));setView("case");setTab(t&&TABS.includes(t)?t:"graph")}
   else if(pathname.startsWith("/networks"))setView("networks");
+  else if(pathname.startsWith("/watchlist"))setView("watchlist");
   else setView("portfolio");
   setPick(null);
   setTimeout(()=>{fromUrl.current=false},0); // if nothing changed, don't swallow the next real navigation
@@ -70,13 +82,13 @@ export default function Dashboard(){
  useEffect(()=>{applyUrl();const on=()=>applyUrl();window.addEventListener("popstate",on);return()=>window.removeEventListener("popstate",on)},[applyUrl]);
  const urlReady=useRef(false);
  useEffect(()=>{
-  const want=view==="case"?`/case/${encodeURIComponent(caseId)}${tab!=="graph"?`?tab=${tab}`:""}`:view==="networks"?"/networks":"/";
+  const want=view==="case"?`/case/${encodeURIComponent(caseId)}${tab!=="graph"?`?tab=${tab}`:""}`:view==="networks"?"/networks":view==="watchlist"?"/watchlist":"/";
   if(!urlReady.current){urlReady.current=true;return} // first render still holds defaults; the URL is the source of truth
   if(fromUrl.current){fromUrl.current=false;return}   // state came from the URL (load or Back/Forward): don't write it back
   const now=window.location.pathname+window.location.search;
   if(now!==want)window.history.pushState(null,"",want);
  },[view,caseId,tab]);
- useEffect(()=>{const x=allCases.find(y=>y.id===caseId);document.title=view==="case"&&x?`${x.name} · BrandTracer`:view==="networks"?"Networks · BrandTracer":"BrandTracer"},[view,caseId,allCases]);
+ useEffect(()=>{const x=allCases.find(y=>y.id===caseId);document.title=view==="case"&&x?`${x.name} · BrandTracer`:view==="networks"?"Networks · BrandTracer":view==="watchlist"?"Watchlist · BrandTracer":"BrandTracer"},[view,caseId,allCases]);
  useEffect(()=>{
   if(new URLSearchParams(window.location.search).get("tour")==="1")setTour(true);
   fetch("/api/auth/me").then(r=>{if(r.status===401){window.location.href="/login";return null}return r.ok?r.json():null}).then(d=>{if(d?.user){setMe(d.user);if(!d.user.onboarded_at)setTour(true)}}).catch(()=>{});
@@ -167,14 +179,15 @@ export default function Dashboard(){
   {vOpen&&g.cats.map(ct=>{const cOpen=Boolean(sq.trim())||cat===ct.k||openGroups.has("c:"+ct.k);return <div key={ct.k} className="sub"><button className="subHead" aria-expanded={cOpen} onClick={()=>toggleGroup("c:"+ct.k)}>{cOpen?<ChevronDown size={12}/>:<ChevronRight size={12}/>}<span>{labelOf(ct.k)}</span><em>{ct.items.length}</em></button>{cOpen&&ct.items.map(renderCase)}</div>})}</div>})}{!sideCases.length&&<p className="sideEmpty">{loading?"Loading investigations…":`No investigations match "${sq}".`}</p>}</div>
  <div className="sideLabel bottom">SYSTEM</div><div className="mini"><ShieldCheck size={15}/> Evidence standard: strict</div><div className="mini"><Sparkles size={15}/> Web research: {webResearch===null?"checking…":webResearch?"on":"off"}</div>
  {me&&<AccountMenu me={me} onReplay={()=>{setNavOpen(false);setTour(true)}}/>}
- </aside>{cmd!==null&&<CommandPalette initial={cmd} onClose={()=>setCmd(null)} onOpenCase={openCase} onResearch={v=>openNew(v)} local={t=>{const l=t.toLowerCase();const out:{group:"brand"|"entity";label:string;detail:string;caseId:string;caseName:string}[]=[];for(const x of allCases){if((x.name+" "+x.domain).toLowerCase().includes(l))out.push({group:"brand",label:x.name,detail:[x.domain,x.category].filter(Boolean).join(" · "),caseId:x.id,caseName:x.name});else{const n=x.nodes.find(n=>n.id!==x.id+":seed"&&n.label.toLowerCase().includes(l));if(n)out.push({group:"entity",label:n.label,detail:n.type,caseId:x.id,caseName:x.name})}if(out.length>40)break}return out}}/>}{tour&&<Onboarding name={me?.full_name} onDone={()=>{setTour(false);setMe(m=>m?{...m,onboarded_at:new Date().toISOString()}:m)}}/>}<section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><nav className="viewSwitch" aria-label="View"><button aria-pressed={view==="portfolio"} className={view==="portfolio"?"on":""} onClick={()=>setView("portfolio")}>Case files</button><button aria-pressed={view==="networks"} className={view==="networks"?"on":""} onClick={()=>setView("networks")}>Networks</button><button aria-pressed={view==="case"} className={view==="case"?"on":""} onClick={()=>setView("case")} title={c.name}>{c.name.length>16?c.name.slice(0,15)+"…":c.name}</button></nav><button className="search searchBtn" onClick={()=>setCmd("")} aria-label="Search everything (⌘K)"><Search size={17}/><span>Search brands, people, pixel IDs, phones…</span><kbd>⌘K</kbd></button><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
+ </aside>{cmd!==null&&<CommandPalette initial={cmd} onClose={()=>setCmd(null)} onOpenCase={openCase} onResearch={v=>openNew(v)} local={t=>{const l=t.toLowerCase();const out:{group:"brand"|"entity";label:string;detail:string;caseId:string;caseName:string}[]=[];for(const x of allCases){if((x.name+" "+x.domain).toLowerCase().includes(l))out.push({group:"brand",label:x.name,detail:[x.domain,x.category].filter(Boolean).join(" · "),caseId:x.id,caseName:x.name});else{const n=x.nodes.find(n=>n.id!==x.id+":seed"&&n.label.toLowerCase().includes(l));if(n)out.push({group:"entity",label:n.label,detail:n.type,caseId:x.id,caseName:x.name})}if(out.length>40)break}return out}}/>}{tour&&<Onboarding name={me?.full_name} onDone={()=>{setTour(false);setMe(m=>m?{...m,onboarded_at:new Date().toISOString()}:m)}}/>}<section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><nav className="viewSwitch" aria-label="View"><button aria-pressed={view==="portfolio"} className={view==="portfolio"?"on":""} onClick={()=>setView("portfolio")}>Case files</button><button aria-pressed={view==="networks"} className={view==="networks"?"on":""} onClick={()=>setView("networks")}>Networks</button><button aria-pressed={view==="watchlist"} className={view==="watchlist"?"on":""} onClick={()=>setView("watchlist")}>Watchlist{watch&&watch.unread>0?<span className="badgeDot" aria-label={`${watch.unread} unread changes`}>{watch.unread>99?"99+":watch.unread}</span>:null}</button><button aria-pressed={view==="case"} className={view==="case"?"on":""} onClick={()=>setView("case")} title={c.name}>{c.name.length>16?c.name.slice(0,15)+"…":c.name}</button></nav><button className="search searchBtn" onClick={()=>setCmd("")} aria-label="Search everything (⌘K)"><Search size={17}/><span>Search brands, people, pixel IDs, phones…</span><kbd>⌘K</kbd></button><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
 
- {view==="portfolio"&&<Portfolio cases={sideCases} total={allCases.length} flag={flag} setFlag={setFlag} onOpen={openCase}/>}
+ {view==="portfolio"&&<Portfolio cases={sideCases} total={allCases.length} flag={flag} setFlag={setFlag} onOpen={openCase} watched={watched} onToggleWatch={toggleWatch}/>}
+ {view==="watchlist"&&<Watchlist data={watch} cases={allCases} onOpen={openCase} onToggle={toggleWatch} onChecked={()=>{loadWatch();if(db)fetch("/api/investigations").then(r=>r.json()).then(d=>{if(d.cases?.length)setAllCases(prev=>d.cases.map((x:Case)=>prev.find(p=>p.id===x.id&&fullIds.has(x.id))?{...prev.find(p=>p.id===x.id)!,metrics:x.metrics,tags:x.tags}:x))}).catch(()=>{})}} onSeen={markWatchSeen}/>}
  {view==="networks"&&<Networks onOpen={openCase}/>}
  {view==="case"&&<> <div className="content">
  {notice&&<div className="notice"><AlertTriangle size={15}/><span>{notice}</span><button onClick={()=>setNotice("")} aria-label="Dismiss"><X size={14}/></button></div>}
  <CaseHero c={c} onCategory={k=>updateCase({...c,category:k})} onFilterVertical={v=>setCat("v:"+v)} onOpen={openCase}/>
- <div className="actionbar"><button onClick={researchCase} disabled={busy||!db}>{busy?<Loader2 size={14} className="spin"/>:<Search size={14}/>} {busy?"Researching…":"Research again"}</button><button onClick={()=>setEvidenceOpen(true)}><Plus size={14}/> Add evidence</button><span>{!db?"Database not connected · research unavailable":webResearch===false?"Web research is off · add ANTHROPIC_API_KEY in Vercel to research people and companies on the web":"Research checks the site, registrations, archives, your other investigations and the web"}</span></div>
+ <div className="actionbar"><StarButton on={watched.has(c.id)} onClick={()=>toggleWatch(c.id,!watched.has(c.id))}/><button onClick={researchCase} disabled={busy||!db}>{busy?<Loader2 size={14} className="spin"/>:<Search size={14}/>} {busy?"Researching…":"Research again"}</button><button onClick={()=>setEvidenceOpen(true)}><Plus size={14}/> Add evidence</button><span>{!db?"Database not connected · research unavailable":webResearch===false?"Web research is off · add ANTHROPIC_API_KEY in Vercel to research people and companies on the web":"Research checks the site, registrations, archives, your other investigations and the web"}</span></div>
  {job&&<div className={"jobBar "+job.status}><div className="jobHead">{busy?<Loader2 size={15} className="spin"/>:job.status==="completed"&&!/^Partial/.test(job.message||"")?<CheckCircle2 size={15}/>:<AlertTriangle size={15}/>}<b>{busy?"Research in progress":job.status==="completed"?(/^Partial/.test(job.message||"")?"Research partly failed":"Research complete"):"Research failed"}</b><span>{job.seed_value}</span></div><div className="jobTrack"><i style={{width:`${Math.max(4,job.progress||0)}%`}}/></div><p>{job.message}</p></div>}
  <nav><button className={tab==="graph"?"sel":""} onClick={()=>setTab("graph")}><Network size={15}/> Relationship graph</button><button className={tab==="evidence"?"sel":""} onClick={()=>setTab("evidence")}><FileText size={15}/> Evidence · {c.evidence.length}</button><button className={tab==="timeline"?"sel":""} onClick={()=>setTab("timeline")}><Clock3 size={15}/> Timeline · {c.timeline.length}</button><button className={tab==="profile"?"sel":""} onClick={()=>setTab("profile")}><Fingerprint size={15}/> Profile</button><button className={tab==="marketing"?"sel":""} onClick={()=>setTab("marketing")}><Megaphone size={15}/> Marketing</button></nav>
  {tab==="graph"&&<div className="panel"><div className="panelHead"><div><b>Network map</b><span>Select any node to see what is known and research it further</span></div><span>{c.nodes.length} entities · {c.edges.length} links</span></div>{c.nodes.length>1?<Graph nodes={c.nodes} edges={c.edges} onPick={setPick}/>:<div className="emptyPanel">{busy?"Research is running. The graph fills in when it finishes.":"Nothing mapped yet. Run research to build the graph."}</div>}</div>}

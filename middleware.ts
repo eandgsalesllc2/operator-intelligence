@@ -17,6 +17,8 @@ async function validApiToken(req:NextRequest){
 export async function middleware(req:NextRequest){
  const {pathname,search}=req.nextUrl;
  if(PUBLIC.some(r=>r.test(pathname)))return NextResponse.next();
+ // Scheduled jobs: only with the CRON_SECRET Vercel Cron sends; closed entirely until that secret is set.
+ if(pathname.startsWith("/api/cron/")){const s=process.env.CRON_SECRET;return s&&req.headers.get("authorization")===`Bearer ${s}`?NextResponse.next():NextResponse.json({error:"Unauthorized"},{status:401})}
  const session=await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
  if(session)return NextResponse.next();
  const isApi=pathname.startsWith("/api/");

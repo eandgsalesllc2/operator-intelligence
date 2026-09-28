@@ -3,6 +3,7 @@ import {useMemo,useState} from "react";
 import {Case} from "@/lib/types";
 import {labelOf,verticalOf} from "@/lib/categories";
 import {compact,currencySymbol} from "@/lib/metrics";
+import {StarButton} from "./Watchlist";
 
 // Every investigation as a case-file card. Uses the sidebar's category/flag/search filters, adds sorting and quick flags.
 const OWN:Record<string,{t:string;tone:string}>={identified:{t:"OWNER IDENTIFIED",tone:"ok"},legal_entity_only:{t:"LEGAL ENTITY ONLY",tone:"warn"},operator_unknown:{t:"OPERATOR UNKNOWN",tone:"bad"},contested:{t:"CONTESTED",tone:"bad"}};
@@ -10,7 +11,7 @@ const QUICK=[["all","All"],["persona-ads","Persona ads"],["subscription","Subscr
 const SORTS={visits:"Traffic",revenue:"Est. revenue",ads:"Active ads",name:"Name"} as const;
 const caseNo=(id:string)=>{let h=7;for(const ch of id)h=(h*33+ch.charCodeAt(0))>>>0;return String(h%10000).padStart(4,"0")};
 
-export default function Portfolio({cases,total,flag,setFlag,onOpen}:{cases:Case[];total:number;flag:string;setFlag:(f:string)=>void;onOpen:(id:string)=>void}){
+export default function Portfolio({cases,total,flag,setFlag,onOpen,watched,onToggleWatch}:{cases:Case[];total:number;flag:string;setFlag:(f:string)=>void;onOpen:(id:string)=>void;watched?:Set<string>;onToggleWatch?:(id:string,on:boolean)=>void}){
  const [sort,setSort]=useState<keyof typeof SORTS>("visits");
  const list=useMemo(()=>[...cases].sort((a,b)=>{
   if(sort==="name")return a.name.localeCompare(b.name);
@@ -28,7 +29,7 @@ export default function Portfolio({cases,total,flag,setFlag,onOpen}:{cases:Case[
    const own=(x.tags||[]).find(t=>t.startsWith("ownership:"))?.slice(10);const o=own?OWN[own]:null;const m=x.metrics;const cur=currencySymbol(m?.currency);
    const net=(x.tags||[]).find(t=>t.startsWith("network:"))?.slice(8);
    const flags=[(x.tags||[]).includes("persona-ads")&&"Persona ads",(x.tags||[]).includes("subscription")&&"Subscription",(x.tags||[]).includes("lawsuit")&&"Lawsuit",(x.tags||[]).includes("regulatory")&&"Regulatory",(x.tags||[]).some(t=>/^bbb:[DF]/.test(t))&&"BBB D/F"].filter(Boolean) as string[];
-   return <button key={x.id} className="pfCard" onClick={()=>onOpen(x.id)}>
+   return <div key={x.id} className="pfWrap">{onToggleWatch&&<StarButton compactMode on={!!watched?.has(x.id)} onClick={()=>onToggleWatch(x.id,!watched?.has(x.id))}/>}<button className="pfCard" onClick={()=>onOpen(x.id)}>
     <span className="pfNo">№ {caseNo(x.id)}</span>
     {o&&<span className={"pfStamp "+o.tone}>{o.t}</span>}
     <span className="pfCat">{x.category?`${verticalOf(x.category)} › ${labelOf(x.category)}`:"Uncategorized"}</span>
@@ -36,6 +37,6 @@ export default function Portfolio({cases,total,flag,setFlag,onOpen}:{cases:Case[
     <span className="pfDomain">{x.domain||"—"}</span>
     <span className="pfNums"><span><small>VISITS</small><b>{m?.monthlyVisits!=null?compact(m.monthlyVisits):"—"}</b></span><span><small>EST. REV</small><b>{m?.revenue?compact(m.revenue.mid,cur):"—"}</b></span><span><small>ADS</small><b>{m?.metaActiveAds!=null?compact(m.metaActiveAds):"—"}</b></span></span>
     {(net||flags.length>0)&&<span className="pfFlags">{net&&<em className="net">{net}</em>}{flags.map(f=><em key={f}>{f}</em>)}</span>}
-   </button>})}</div>:<p className="pfEmpty">No brands match these filters.</p>}
+   </button></div>})}</div>:<p className="pfEmpty">No brands match these filters.</p>}
  </div>;
 }
