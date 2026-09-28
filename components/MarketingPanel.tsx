@@ -45,10 +45,10 @@ function Channels({c}:{c:Case}){
  const scan=m?.channelScan;
  return <section className="psec chSec"><h4><Radio size={14}/> Channels <span className="dim small">{live} live · {tag} with tracking installed{rows.length-live-tag?` · ${rows.length-live-tag} mentioned`:""}</span></h4>
   <div className="chGrid">{GROUP_ORDER.map(g=>{const rs=rows.filter(r=>r.group===g);if(!rs.length)return null;
-   return <div key={g} className="chGroup"><h5>{g}</h5><ul>{rs.map(r=><li key={r.name} className={"chRow "+r.status} tabIndex={0} aria-describedby={`ch-${r.name.replace(/\W+/g,"-")}`}>
+   return <div key={g} className="chGroup"><h5>{g}</h5><ul>{rs.map(r=><li key={r.name} className={"chRow st-"+r.status} tabIndex={0} aria-describedby={`ch-${r.name.replace(/\W+/g,"-")}`}>
     <i aria-hidden="true"/><span className="chName">{r.name}</span><span className="chSt">{ST_LABEL[r.status]}</span>
     <div className="chEv" role="tooltip" id={`ch-${r.name.replace(/\W+/g,"-")}`}>{r.evidence.map((e,i)=><div key={i}>{e}</div>)}</div></li>)}</ul></div>})}</div>
-  <p className="dim small"><b className="chKey live"/> Live = ads, posts or emails actually seen. <b className="chKey tag"/> Tag installed = the store has that platform&apos;s pixel or vendor script, so it&apos;s set up to buy or track there — not proof of current spend. <b className="chKey mention"/> Research mention = named in web research only. Hover a channel for the evidence.{scan?` Storefront scanned ${scan.checkedAt.slice(0,10)}${scan.gtm.length?` incl. Tag Manager ${scan.gtm.join(", ")}`:""}.`:" Storefront not scanned yet."} Native networks (Taboola, NewsBreak, AppLovin…) are only visible through their tags; tags loaded server-side can be missed.</p>
+  <p className="dim small"><b className="chKey st-live"/> Live = ads, posts or emails actually seen. <b className="chKey st-tag"/> Tag installed = the store has that platform&apos;s pixel or vendor script, so it&apos;s set up to buy or track there — not proof of current spend. <b className="chKey st-mention"/> Research mention = named in web research only. Hover a channel for the evidence.{scan?` Storefront scanned ${scan.checkedAt.slice(0,10)}${scan.gtm.length?` incl. Tag Manager ${scan.gtm.join(", ")}`:""}.`:" Storefront not scanned yet."} Native networks (Taboola, NewsBreak, AppLovin…) are only visible through their tags; tags loaded server-side can be missed.</p>
  </section>;
 }
 
