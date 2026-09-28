@@ -68,3 +68,38 @@ export async function matchIdentifiers(normalized:string[],excludeInvestigationI
  const inv=new Map(invs.map(i=>[i.id,i]));
  return hits.filter(h=>inv.has(h.investigation_id)).map(h=>({...h,name:inv.get(h.investigation_id).name,domain:inv.get(h.investigation_id).domain,category:inv.get(h.investigation_id).category||""}));
 }
+
+// ---------- Networks: clusters of investigations that share strong identifiers or a named parent network ----------
+export type NetworkLink={a:string;b:string;shared:{kind:string;value:string}[]};
+export type NetworkCluster={id:string;label:string;members:{id:string;name:string;domain:string;category:string;visits:number|null}[];links:NetworkLink[];hard:boolean;visits:number};
+const HARD=new Set(["company","person","trademark_serial","phone","email","shopify_store","shopify_shop_id","gtm","google_analytics","google_ads","meta_pixel","tiktok_pixel","clarity","klaviyo","checkout_account","payment_id","amazon_seller","card_descriptor"]);
+const LINKING=new Set([...HARD,"domain","address","funnel_host","tracking"]);
+export async function networkClusters():Promise<NetworkCluster[]>{
+ if(!hasDb())return [];
+ const [ids,invs]=await Promise.all([fetchAll("oi_identifiers?select=investigation_id,kind,value,normalized"),fetchAll("investigations?select=id,name,domain,category,tags,monthly_visits")]);
+ const inv=new Map<string,any>(invs.map((i:any)=>[i.id,i]));
+ // identifier → investigations that carry it
+ const groups=new Map<string,{kind:string;value:string;ids:Set<string>}>();
+ for(const r of ids){if(!LINKING.has(r.kind)||!inv.has(r.investigation_id))continue;const k=r.kind+"|"+r.normalized;const g=groups.get(k)||{kind:r.kind,value:r.value,ids:new Set<string>()};g.ids.add(r.investigation_id);groups.set(k,g)}
+ // Named parent networks from tags ("network:Guthy-Renker") link their members too.
+ for(const i of invs)for(const t of (i.tags||[]) as string[])if(t.startsWith("network:")){const k="network|"+t.slice(8).toLowerCase().replace(/[.,]|\b(inc|llc|ltd|corp|co)\b/g,"").trim();const g=groups.get(k)||{kind:"network",value:t.slice(8),ids:new Set<string>()};g.ids.add(i.id);groups.set(k,g)}
+ const pair=new Map<string,NetworkLink>();
+ for(const g of groups.values()){
+  if(g.ids.size<2||g.ids.size>12)continue; // very common values are vendors, not operators
+  const list=[...g.ids].sort();
+  for(let x=0;x<list.length;x++)for(let y=x+1;y<list.length;y++){const k=list[x]+"~"+list[y];const l=pair.get(k)||{a:list[x],b:list[y],shared:[]};l.shared.push({kind:g.kind,value:g.value});pair.set(k,l)}
+ }
+ // union-find over linked pairs
+ const parent=new Map<string,string>();const find=(x:string):string=>{const p=parent.get(x)??x;if(p===x)return x;const r=find(p);parent.set(x,r);return r};
+ for(const l of pair.values()){const ra=find(l.a),rb=find(l.b);if(ra!==rb)parent.set(ra,rb)}
+ const comps=new Map<string,Set<string>>();for(const l of pair.values())for(const id of [l.a,l.b]){const r=find(id);if(!comps.has(r))comps.set(r,new Set());comps.get(r)!.add(id)}
+ const out:NetworkCluster[]=[];
+ for(const [root,memberIds] of comps){
+  const links=[...pair.values()].filter(l=>memberIds.has(l.a));
+  const members=[...memberIds].map(id=>{const i=inv.get(id);return {id,name:i.name,domain:i.domain||"",category:i.category||"",visits:i.monthly_visits??null}}).sort((a,b)=>(b.visits||0)-(a.visits||0));
+  const counts=new Map<string,number>();for(const l of links)for(const s of l.shared)if(["network","company","person"].includes(s.kind))counts.set(s.value,(counts.get(s.value)||0)+1);
+  const top=[...counts.entries()].sort((a,b)=>b[1]-a[1])[0]?.[0];
+  out.push({id:root,label:top||members.slice(0,2).map(m=>m.name).join(" + "),members,links,hard:links.some(l=>l.shared.some(s=>HARD.has(s.kind)||s.kind==="network")),visits:members.reduce((s,m)=>s+(m.visits||0),0)});
+ }
+ return out.sort((a,b)=>Number(b.hard)-Number(a.hard)||b.members.length-a.members.length||b.visits-a.visits);
+}

@@ -243,3 +243,64 @@ button.indexCard{cursor:pointer}button.indexCard:hover{border-color:#b23a26}
 .authSubmit{background:var(--rust);border-color:var(--rust)}.authSubmit:hover{background:#a8361f}
 .obText h2{font-family:var(--f-display)}.obNext{background:var(--rust);border-color:var(--rust)}
 @media (max-width:760px){.dossier{padding:28px 18px 22px;margin-top:22px}.dossierTab{left:18px}.stamp{position:static;display:inline-block;transform:rotate(-4deg);margin:0 0 12px;font-size:12px}.dossierSubject,.dossierName{padding-right:0}.dossierName{font-size:40px}.dossierSummary{font-size:16px}.fields{grid-template-columns:repeat(2,minmax(0,1fr))}.fields>div{padding-left:0;border-right:0;border-bottom:1px solid #d6c9b1}.fields b{font-size:28px}.indexCard{transform:none!important}}
+/* view switch */
+.viewSwitch{display:flex;gap:2px;background:#221d17;border:1px solid #3a3228;border-radius:8px;padding:3px;flex:none}
+.viewSwitch button{border:0;background:transparent;color:#a99e8c;font:inherit;font-size:13px;padding:7px 12px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.viewSwitch button.on{background:#efe6d6;color:#1d1a16;font-weight:600}
+/* portfolio + networks shared */
+.portfolio{padding:28px 32px 48px;max-width:1400px}
+.pfHead{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+.pfKicker{font-family:var(--f-mono);font-size:12px;letter-spacing:1.6px;color:#8a7f6c}
+.pfHead h1{margin:6px 0 4px;font-family:var(--f-display);font-weight:800;font-size:38px;letter-spacing:-.8px;color:#efe6d6}
+.pfHead p{margin:0;color:#a99e8c;max-width:760px;line-height:1.5}
+.pfSort{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;color:#a99e8c}
+.pfSort select{background:#221d17;color:#efe6d6;border:1px solid #3a3228;border-radius:6px;padding:7px 10px;font:inherit}
+.pfChips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.pfChips button{border:1px solid #3a3228;background:#1c1814;color:#cbbfa8;border-radius:999px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer}
+.pfChips button.on{background:var(--rust);border-color:var(--rust);color:#fff7ee}
+.pfGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:22px 18px}
+.pfCard{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;background:var(--paper);color:var(--ink);border:0;border-radius:3px;padding:26px 18px 16px;font:inherit;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.35);transition:transform .15s,box-shadow .15s}
+.pfCard:hover{transform:translateY(-3px) rotate(-.4deg);box-shadow:0 14px 30px rgba(0,0,0,.45)}
+.pfCard:focus-visible{outline:3px solid var(--rust);outline-offset:3px}
+.pfNo{position:absolute;top:-10px;left:14px;background:#d9cbb2;color:#4a3f31;font-family:var(--f-mono);font-size:10.5px;letter-spacing:1.2px;padding:3px 9px;border-radius:3px 3px 0 0}
+.pfStamp{position:absolute;top:12px;right:10px;transform:rotate(-6deg);border:2px solid;font-family:var(--f-mono);font-size:9.5px;letter-spacing:1.2px;padding:3px 6px;border-radius:3px}
+.pfStamp.ok{color:#1f5e46}.pfStamp.warn{color:#8a5a0c}.pfStamp.bad{color:#b23a26}
+.pfCat{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.8px;color:#7a6d5a;text-transform:uppercase;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfName{font-family:var(--f-display);font-weight:800;font-size:26px;letter-spacing:-.4px;line-height:1.1;margin-top:4px;overflow-wrap:anywhere}
+.pfDomain{font-family:var(--f-mono);font-size:12px;color:#5c5244}
+.pfNums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;margin-top:10px;border-top:2px solid var(--ink)}
+.pfNums>span{padding:8px 8px 0 0}.pfNums small{display:block;font-family:var(--f-mono);font-size:9.5px;letter-spacing:1px;color:#7a6d5a}.pfNums b{font-family:var(--f-display);font-size:20px;font-weight:600}
+.pfFlags{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.pfFlags em{font-style:normal;font-family:var(--f-mono);font-size:10px;letter-spacing:.5px;background:#e3d6bf;color:#4a3f31;padding:2px 7px;border-radius:2px}
+.pfFlags em.net{background:#1d1a16;color:#efe6d6}
+.pfEmpty{color:#a99e8c;display:flex;gap:8px;align-items:center}
+/* networks */
+.nwList{display:grid;grid-template-columns:repeat(auto-fill,minmax(560px,1fr));gap:20px}
+.nwBoard{background:var(--cork);background-image:radial-gradient(#3b3127 1px,transparent 1px);background-size:18px 18px;border:1px solid #3b3127;border-radius:4px;padding:16px 18px}
+.nwHead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.nwHead h2{margin:0;font-family:var(--f-display);font-size:22px;color:#efe6d6}
+.nwHead span{font-family:var(--f-mono);font-size:11px;letter-spacing:1px;color:#a99e8c}
+.nwSvg{width:100%;height:auto;display:block;margin-top:6px}
+.nwCard{cursor:pointer}.nwCard:hover .card,.nwCard:focus .card{fill:#fbf6ec}.nwCard:focus{outline:none}
+.nwName{fill:#1d1a16;font-family:var(--f-body);font-weight:600;font-size:13px}
+.nwSub{fill:#5c5244;font-family:var(--f-mono);font-size:10px}
+.nwLabel{fill:#efe6d6;font-family:var(--f-mono);font-size:10px;text-anchor:middle;paint-order:stroke;stroke:#2a231c;stroke-width:5px}
+.nwWhy{margin-top:8px;color:#cbbfa8;font-size:13px}.nwWhy summary{cursor:pointer;font-family:var(--f-mono);font-size:11px;letter-spacing:1px;color:#e0a93f}
+.nwWhy ul{margin:8px 0;padding-left:18px;display:grid;gap:4px}.nwWhy p{margin:4px 0 0;color:#8a7f6c;font-size:12px}
+/* marketing: money strip + clippings */
+.money{background:#1c1814;border:1px solid #3a3228;border-radius:6px;padding:16px 18px;margin-bottom:16px}
+.money h4{margin:0 0 12px;font-family:var(--f-display);font-size:20px}
+.money ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:26px;position:relative}
+.money li{position:relative;background:var(--paper);color:var(--ink);border-radius:3px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.money li+li::before{content:"";position:absolute;left:-22px;top:50%;width:18px;height:2px;background:var(--rust)}
+.money li.hot{box-shadow:inset 0 0 0 2px var(--rust)}
+.money .mk{font-family:var(--f-mono);font-size:10.5px;letter-spacing:1.2px;color:#7a6d5a}
+.money b{font-family:var(--f-display);font-size:28px;font-weight:600}
+.money .ms{font-family:var(--f-mono);font-size:11.5px;color:#5c5244;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ads.clippings{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.clippings .adCard{background:#f3ecdf;color:var(--ink);border:0;border-radius:0;padding:14px 16px 16px;box-shadow:0 6px 16px rgba(0,0,0,.35);position:relative}
+.clippings .adCard:nth-child(3n+1){transform:rotate(-.8deg)}.clippings .adCard:nth-child(3n+2){transform:rotate(.6deg)}.clippings .adCard:nth-child(3n){transform:rotate(-.3deg)}
+.clippings .adCard::before{content:"";position:absolute;top:-7px;left:50%;width:56px;height:14px;margin-left:-28px;background:rgba(217,203,178,.85);transform:rotate(-2deg)}
+.clippings .adCard p{font-family:var(--f-display);font-size:15px;line-height:1.45;color:#2f2922}
+.clippings .adCard b{color:var(--ink)}.clippings .adCard .dim,.clippings .adCard .small{color:#6b604f!important}
+@media (max-width:760px){.viewSwitch button{padding:6px 8px;font-size:12px}.viewSwitch button:last-child{display:none}.portfolio{padding:20px 16px 40px}.pfHead h1{font-size:28px}.nwList{grid-template-columns:minmax(0,1fr)}.money li+li::before{display:none}}

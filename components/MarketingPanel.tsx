@@ -16,12 +16,31 @@ function Bars({data,total}:{data?:Record<string,number>;total?:number}){
 }
 function Chips({items,tone}:{items?:string[];tone?:string}){return items&&items.length?<div className="chips">{items.map((x,i)=><span key={i} className={"chipTag "+(tone||"")}>{x}</span>)}</div>:<span className="dim">—</span>}
 
+
+// "How the money moves": ad sources → presell → where the sale happens, from Meta pages and live landing pages.
+function MoneyStrip({m}:{m:NonNullable<Case["marketing"]>}){
+ const pages=m.meta?.pages||[];const lp=m.landing?.landingPages||[];
+ const brandAds=pages.filter(p=>!p.persona).reduce((s,p)=>s+(p.activeAds||0),0),personaAds=pages.filter(p=>p.persona).reduce((s,p)=>s+(p.activeAds||0),0);
+ const sum=(ks:string[])=>lp.filter(l=>ks.includes(l.kind||"")).reduce((s,l)=>s+(l.activeAds||0),0);
+ const top=(ks:string[])=>lp.filter(l=>ks.includes(l.kind||"")).sort((a,b)=>(b.activeAds||0)-(a.activeAds||0))[0];
+ const pre=["advertorial","quiz","offer_lp"],store=["product","collection","home","checkout"],off=["marketplace","external"];
+ const steps=[
+  {k:"01 · ADS",n:m.meta?.activeAds??null,sub:personaAds?`${compact(personaAds)} via persona pages · ${compact(brandAds)} brand`:m.meta?.activeAds!=null?"from the brand's own pages":"no Meta ads tracked",hot:personaAds>brandAds},
+  {k:"02 · PRESELL",n:sum(pre)||null,sub:top(pre)?`${top(pre)!.kind==="quiz"?"quiz":top(pre)!.kind==="advertorial"?"advertorial":"offer page"} ${top(pre)!.path}`:"straight to the store",hot:sum(pre)>0},
+  {k:"03 · STORE",n:sum(store)||null,sub:top(store)?`${top(store)!.path}`:"—",hot:false},
+  ...(sum(off)?[{k:"04 · OFF-SITE",n:sum(off),sub:`${top(off)!.host}${top(off)!.path}`,hot:true}]:[]),
+ ];
+ if(!m.meta&&!lp.length)return null;
+ return <section className="money"><h4>How the money moves</h4><ol>{steps.map((st,i)=><li key={i} className={st.hot?"hot":""}><span className="mk">{st.k}</span><b>{st.n!=null?compact(st.n):"—"}</b><span className="ms">{st.sub}</span></li>)}</ol><p className="dim small">Counts are active ads. Ads per page come from BrandSearch; landing pages from Atria{m.landing?.sampledActiveAds?` (top ${m.landing.sampledActiveAds} ads by impressions)`:""}.</p></section>;
+}
+
 export default function MarketingPanel({c}:{c:Case}){
  const m=c.marketing;
  if(!m)return <div className="panel"><div className="emptyPanel">No marketing data yet for this investigation.</div></div>;
  const s=m.strategy||{};const meta=m.meta;
  return <div className="profile">
   {m.dataWarning&&<div className="notice"><Flag size={15}/><span><b>Check this data:</b> {m.dataWarning}</span></div>}
+  <MoneyStrip m={m}/>
   <div className="pcards">
    <section className="pcard wide"><h4><Target size={14}/> Acquisition strategy {s.scale&&<span className={"chipTag "+(SCALE_TONE[s.scale]||"")}>{s.scale} ad scale</span>}</h4><p className="lead2">{s.summary||"No summary."}</p>
     <div className="kv"><span>Channels</span><Chips items={s.channels}/></div>
@@ -41,7 +60,7 @@ export default function MarketingPanel({c}:{c:Case}){
     <div><h5>Call to action</h5><Bars data={meta.ctaMix}/></div>
     <div><h5>Top countries</h5><Chips items={meta.topCountries?.slice(0,12)}/></div>
    </div>
-   {(meta.topAds||[]).length>0&&<><h5>Top active ads by reach</h5><div className="ads">{meta.topAds!.map((a,i)=><article key={i} className="adCard"><div className="adTop"><span className="chipTag">{a.angle||"—"}</span><span className="dim small">{a.format}{a.cta?` · ${a.cta}`:""}{a.euReach!=null?` · ${compact(a.euReach)} EU reach`:""}</span></div>{a.headline&&<b>{a.headline}</b>}<p>“{a.hook}”</p>{a.landing&&<span className="mono small dim">→ {a.landing}{a.funnel?` (${a.funnel})`:""}</span>}</article>)}</div></>}
+   {(meta.topAds||[]).length>0&&<><h5>Clippings · top active ads</h5><div className="ads clippings">{meta.topAds!.map((a,i)=><article key={i} className="adCard"><div className="adTop"><span className="chipTag">{a.angle||"—"}</span><span className="dim small">{a.format}{a.cta?` · ${a.cta}`:""}{a.euReach!=null?` · ${compact(a.euReach)} EU reach`:""}</span></div>{a.headline&&<b>{a.headline}</b>}<p>“{a.hook}”</p>{a.landing&&<span className="mono small dim">→ {a.landing}{a.funnel?` (${a.funnel})`:""}</span>}</article>)}</div></>}
    {(meta.pages||[]).length>0&&<><h5><Users size={13}/> Pages running the ads</h5><div className="tableWrap"><table className="ptable"><thead><tr><th>Page</th><th>Type</th><th>Ads (active)</th><th>Likes</th><th>EU spend</th><th>Created</th></tr></thead><tbody>{meta.pages!.map((p,i)=><tr key={i}><td><b>{p.name}</b></td><td>{p.persona?<span className="chipTag warn">persona</span>:"brand"}</td><td>{(p.ads||0).toLocaleString()} ({(p.activeAds||0).toLocaleString()})</td><td>{p.likes!=null?p.likes.toLocaleString():"—"}</td><td>{p.euSpend?compact(p.euSpend,"€"):"—"}</td><td>{p.created||"—"}</td></tr>)}</tbody></table></div></>}
   </section>}
 
