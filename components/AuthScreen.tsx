@@ -20,7 +20,7 @@ export default function AuthScreen({mode,next}:{mode:"login"|"signup";next?:stri
  }
  return <div className="auth">
   <section className="authStory">
-   <div className="logo"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><circle cx="13" cy="13" r="9" stroke="currentColor" strokeWidth="2"/><path d="M20 20l7 7" stroke="#c2412d" strokeWidth="3" strokeLinecap="round"/><circle cx="13" cy="13" r="3" fill="#c2412d"/></svg><span className="wordmark">BrandTracer</span></div>
+   <a className="logo logoBtn" href="/" aria-label="BrandTracer home"><svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><circle cx="13" cy="13" r="9" stroke="currentColor" strokeWidth="2"/><path d="M20 20l7 7" stroke="#c2412d" strokeWidth="3" strokeLinecap="round"/><circle cx="13" cy="13" r="3" fill="#c2412d"/></svg><span className="wordmark">BrandTracer</span></a>
    <div className="authPitch">
     <div className="authTab">CASE FILE № 0001</div>
     <h1>See who is really behind every DTC brand.</h1>

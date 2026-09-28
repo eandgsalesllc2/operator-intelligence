@@ -304,3 +304,4 @@ button.indexCard{cursor:pointer}button.indexCard:hover{border-color:#b23a26}
 .clippings .adCard p{font-family:var(--f-display);font-size:15px;line-height:1.45;color:#2f2922}
 .clippings .adCard b{color:var(--ink)}.clippings .adCard .dim,.clippings .adCard .small{color:#6b604f!important}
 @media (max-width:760px){.viewSwitch button{padding:6px 8px;font-size:12px}.viewSwitch button:last-child{display:none}.portfolio{padding:20px 16px 40px}.pfHead h1{font-size:28px}.nwList{grid-template-columns:minmax(0,1fr)}.money li+li::before{display:none}}
+.logoBtn{border:0;background:transparent;font:inherit;cursor:pointer;text-decoration:none;text-align:left}.logoBtn:hover .wordmark{color:#fff7ee}.logoBtn:focus-visible{outline:2px solid var(--rust);outline-offset:4px;border-radius:6px}
