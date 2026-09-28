@@ -163,6 +163,17 @@ export async function applySellingPlans(updates:{id:string;plans:import("./selli
  return {changed,subscription:nowSub};
 }
 
+// Store storefront channel scans (pixels / vendor tags) on each brand's marketing record.
+export async function applyChannelScans(updates:{id:string;scan:import("./channel-signatures").ChannelScan}[]){
+ let changed=0;
+ for(const u of updates){
+  const r=(await request(`investigations?id=eq.${encodeURIComponent(u.id)}&select=id,marketing`))?.[0];if(!r)continue;
+  await request("investigations?id=eq."+encodeURIComponent(u.id),{method:"PATCH",body:JSON.stringify({marketing:{...(r.marketing||{}),channelScan:u.scan}})});
+  changed++;
+ }
+ return {changed};
+}
+
 // Manual subscription call for a brand ("on" / "off", or null to go back to automatic detection).
 export async function setSubscriptionOverride(id:string,value:"on"|"off"|null,note?:string){
  const {subscriptionFor}=await import("./metrics");

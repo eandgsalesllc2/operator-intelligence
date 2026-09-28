@@ -4,6 +4,7 @@ import {aiResearchEnabled,claudeResearch,writeStrategy} from "./ai-research";
 import {pullMarketing} from "./marketing-sources";
 import {subscriptionFor} from "./metrics";
 import {detectSellingPlans} from "./selling-plans";
+import {detectChannels} from "./channels";
 import {Draft,layout,mergeDraft} from "./case-builder";
 import {cleanDomain,isPublicHostname} from "./net";
 import {getInvestigation,matchIdentifiers,saveInvestigation,saveProviderFindings,updateResearchJob} from "./repository";
@@ -110,6 +111,7 @@ export async function runResearchJob(job:any){
   const brandName=/\.[a-z]{2,}$/i.test(c.name)?"":c.name;
   const marketingP=domain?pullMarketing(domain,brandName).catch(()=>null):Promise.resolve(null);
   const plansP=domain?detectSellingPlans(domain).catch(()=>null):Promise.resolve(null);
+  const channelsP=domain?detectChannels(domain).catch(()=>null):Promise.resolve(null);
   const active=providers.filter(p=>p.supports(ctx));
   const drafts:Draft[]=[];const notes:string[]=[];let findingsTotal=0;const found:NonNullable<Profile["identifiers"]>[]=[];
   let done=0;
@@ -198,6 +200,8 @@ export async function runResearchJob(job:any){
     }
     merged={...merged,marketing:m};
    }
+   let scan=await channelsP;if(storeDomain&&!scan)scan=await detectChannels(storeDomain).catch(()=>null);
+   if(scan)merged={...merged,marketing:{...(merged.marketing||{}),channelScan:scan}};
    if(mp?.metrics?.monthlyVisits!=null||(mp?.metrics&&!merged.metrics?.monthlyVisits)){
     const met=mp!.metrics!;
     merged={...merged,metrics:{...met,subscription:subscriptionFor(met,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers,merged.profile?.identifiers?.sellingPlans,merged.profile?.identifiers?.subscriptionOverride)}};

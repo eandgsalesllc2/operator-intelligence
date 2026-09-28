@@ -424,3 +424,20 @@ button.chItem{cursor:pointer}button.chItem:hover{background:#221d17}
 .addForm .authSubmit{margin:0;height:40px}
 .createdBox{margin-top:14px;background:#153a2c;border:1px solid #1f5e46;border-radius:6px;padding:12px 14px;color:#dff3ea;display:grid;gap:8px;font-size:13.5px}
 .createdBox .resetLink button{display:inline-flex;gap:5px;align-items:center;border:1px solid #1f5e46;background:#0f2a20;color:#efe6d6;border-radius:6px;padding:6px 10px;cursor:pointer;font:inherit;font-size:12.5px}
+.chSec h4 .dim{margin-left:8px;font-weight:400;letter-spacing:0;text-transform:none}
+.chGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin:10px 0 8px}
+.chGroup h5{margin:0 0 6px}
+.chGroup ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.chRow{position:relative;display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line,#d8ccb6);border-radius:4px;font-size:13px;cursor:default;background:rgba(255,255,255,.35)}
+.chRow i{width:9px;height:9px;border-radius:50%;flex:none;border:1.5px solid currentColor}
+.chRow.live i{background:#c2412d;border-color:#c2412d}
+.chRow.tag i{background:#e0a93f;border-color:#e0a93f}
+.chRow.mention i{background:transparent;border-color:#9a8f7c}
+.chRow.mention{opacity:.8}
+.chName{flex:1;min-width:0}
+.chSt{font-size:11px;color:#7a6f5c;white-space:nowrap}
+.chRow.live .chSt{color:#c2412d;font-weight:600}
+.chEv{display:none;position:absolute;z-index:30;left:0;top:calc(100% + 4px);min-width:220px;max-width:320px;background:#16130f;color:#efe6d6;border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.45;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.chRow:hover .chEv,.chRow:focus .chEv{display:block}
+.chKey{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px 0 6px;vertical-align:middle}
+.chKey.live{background:#c2412d}.chKey.tag{background:#e0a93f}.chKey.mention{border:1.5px solid #9a8f7c}

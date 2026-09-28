@@ -36,6 +36,8 @@ export type Marketing={
   advertisers?:{id:string;name:string;totalAds?:number;role?:string}[];
   landingPages?:{url:string;host?:string;path?:string;kind?:string;activeAds?:number;bestRank?:number|null;maxDaysRunning?:number|null;pages?:string[];headline?:string|null;status?:string}[];
   hosts?:{host:string;activeAds:number}[];kindMix?:Record<string,number>;brandsearchFunnelMix?:Record<string,number>|null}|null;
+ // Pixels and vendor tags found on the storefront (see lib/channels.ts).
+ channelScan?:import("./channel-signatures").ChannelScan|null;
  strategy?:{summary?:string;channels?:string[];angles?:string[];offers?:string[];audience?:string[];creativeStyle?:string[];scale?:string;complianceFlags?:string[]}|null;
 };
 

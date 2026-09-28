@@ -2,7 +2,8 @@
 import {Case} from "@/lib/types";
 import {compact} from "@/lib/metrics";
 import AdWall from "./AdWall";
-import {Megaphone,Target,Mail,PlayCircle,Users,Flag,Route,Link2} from "lucide-react";
+import {channelRows,GROUP_ORDER} from "@/lib/channel-view";
+import {Megaphone,Target,Mail,PlayCircle,Users,Flag,Route,Link2,Radio} from "lucide-react";
 
 const KIND_TONE:Record<string,string>={advertorial:"warn",quiz:"warn",offer_lp:"",product:"dim",collection:"dim",home:"dim",marketplace:"",external:"bad",checkout:"dim"};
 const KIND_LABEL:Record<string,string>={advertorial:"advertorial / presell",offer_lp:"offer page",product:"product page",collection:"collection",home:"homepage",quiz:"quiz",checkout:"checkout",marketplace:"marketplace",external:"off-site"};
@@ -35,6 +36,22 @@ function MoneyStrip({m}:{m:NonNullable<Case["marketing"]>}){
  return <section className="money"><h4>How the money moves</h4><ol>{steps.map((st,i)=><li key={i} className={st.hot?"hot":""}><span className="mk">{st.k}</span><b>{st.n!=null?compact(st.n):"—"}</b><span className="ms">{st.sub}</span></li>)}</ol><p className="dim small">Counts are active ads. Ads per page come from BrandSearch; landing pages from Atria{m.landing?.sampledActiveAds?` (top ${m.landing.sampledActiveAds} ads by impressions)`:""}.</p></section>;
 }
 
+const ST_LABEL={live:"Live",tag:"Tag installed",mention:"Research mention"};
+// Every channel the brand shows up in, grouped; colour = strength of evidence.
+function Channels({c}:{c:Case}){
+ const m=c.marketing;const rows=channelRows(m,c.profile?.identifiers?.amazonSellers);
+ if(!rows.length)return null;
+ const live=rows.filter(r=>r.status==="live").length,tag=rows.filter(r=>r.status==="tag").length;
+ const scan=m?.channelScan;
+ return <section className="psec chSec"><h4><Radio size={14}/> Channels <span className="dim small">{live} live · {tag} with tracking installed{rows.length-live-tag?` · ${rows.length-live-tag} mentioned`:""}</span></h4>
+  <div className="chGrid">{GROUP_ORDER.map(g=>{const rs=rows.filter(r=>r.group===g);if(!rs.length)return null;
+   return <div key={g} className="chGroup"><h5>{g}</h5><ul>{rs.map(r=><li key={r.name} className={"chRow "+r.status} tabIndex={0} aria-describedby={`ch-${r.name.replace(/\W+/g,"-")}`}>
+    <i aria-hidden="true"/><span className="chName">{r.name}</span><span className="chSt">{ST_LABEL[r.status]}</span>
+    <div className="chEv" role="tooltip" id={`ch-${r.name.replace(/\W+/g,"-")}`}>{r.evidence.map((e,i)=><div key={i}>{e}</div>)}</div></li>)}</ul></div>})}</div>
+  <p className="dim small"><b className="chKey live"/> Live = ads, posts or emails actually seen. <b className="chKey tag"/> Tag installed = the store has that platform&apos;s pixel or vendor script, so it&apos;s set up to buy or track there — not proof of current spend. <b className="chKey mention"/> Research mention = named in web research only. Hover a channel for the evidence.{scan?` Storefront scanned ${scan.checkedAt.slice(0,10)}${scan.gtm.length?` incl. Tag Manager ${scan.gtm.join(", ")}`:""}.`:" Storefront not scanned yet."} Native networks (Taboola, NewsBreak, AppLovin…) are only visible through their tags; tags loaded server-side can be missed.</p>
+ </section>;
+}
+
 export default function MarketingPanel({c}:{c:Case}){
  const m=c.marketing;
  if(!m)return <div className="panel"><div className="emptyPanel">No marketing data yet for this investigation.</div></div>;
@@ -42,6 +59,7 @@ export default function MarketingPanel({c}:{c:Case}){
  return <div className="profile">
   {m.dataWarning&&<div className="notice"><Flag size={15}/><span><b>Check this data:</b> {m.dataWarning}</span></div>}
   <MoneyStrip m={m}/>
+  <Channels c={c}/>
   <AdWall investigationId={c.id}/>
   <div className="pcards">
    <section className="pcard wide"><h4><Target size={14}/> Acquisition strategy {s.scale&&<span className={"chipTag "+(SCALE_TONE[s.scale]||"")}>{s.scale} ad scale</span>}</h4><p className="lead2">{s.summary||"No summary."}</p>
