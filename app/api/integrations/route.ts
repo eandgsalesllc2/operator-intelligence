@@ -11,6 +11,15 @@ export async function GET(req:NextRequest){
  const status={brandsearch:brandsearchEnabled(),atria:atriaEnabled()};
  if(!domain)return Response.json(status);
  // ?probe=atria&keyword=x → status and shape of one raw Atria brand search (for diagnosing matches).
+ if(req.nextUrl.searchParams.get("probe")==="atria-ads"){
+  const u=new URL(`https://api.tryatria.com/open/v1/brand-library/${encodeURIComponent(req.nextUrl.searchParams.get("id")||"")}/ads`);
+  for(const [k,v] of req.nextUrl.searchParams)if(!["probe","id","domain"].includes(k))u.searchParams.append(k,v);
+  const r=await fetch(u,{headers:{"X-API-Key":process.env.ATRIA_API_KEY||"",Accept:"application/json"},cache:"no-store"});
+  const text=await r.text();let body:any=null;try{body=JSON.parse(text)}catch{}
+  const items=body?.data?.items||[];
+  return Response.json({status:r.status,message:body?.message||body?.errorMessage||(body?null:text.slice(0,300)),total:body?.data?.total,cursor:!!body?.data?.cursor,count:items.length,
+   sample:items.slice(0,3).map((a:any)=>({brand_name:a.brand_name,status:a.status,link_url:a.link_url,days_running:a.days_running,impression_rank:a.impression_rank}))});
+ }
  if(req.nextUrl.searchParams.get("probe")==="atria"){
   const u=new URL("https://api.tryatria.com/open/v1/brand-library/search");u.searchParams.set("keyword",req.nextUrl.searchParams.get("keyword")||domain);u.searchParams.set("page_size","5");
   const r=await fetch(u,{headers:{"X-API-Key":process.env.ATRIA_API_KEY||"",Accept:"application/json"},cache:"no-store"});
