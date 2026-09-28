@@ -31,7 +31,7 @@ export default function Watchlist({data,cases,onOpen,onToggle,onChecked,onSeen}:
    <section className="watchList"><h2>Watched brands</h2>{data.items.map(it=>{const c=byId.get(it.investigation_id);const n=data.changes.filter(x=>x.investigation_id===it.investigation_id).length;
     return <div key={it.investigation_id} className="watchRow">
      <button className="watchMain" onClick={()=>onOpen(it.investigation_id)}><b>{c?.name||it.investigation_id}</b><span>{c?.domain||""}{c?.metrics?.monthlyVisits!=null?` · ${compact(c.metrics.monthlyVisits)} visits/mo`:""}</span></button>
-     <span className="watchMeta">checked {ago(it.lastChecked)}<br/>{n} change{n===1?"":"s"}</span>
+     <span className="watchMeta">{it.lastChecked?`checked ${ago(it.lastChecked)}`:"not checked yet"}<br/>{n} change{n===1?"":"s"}</span>
      <button className="watchBtn" disabled={busy===it.investigation_id} onClick={()=>check(it.investigation_id)}>{busy===it.investigation_id?<Loader2 size={14} className="spin"/>:<RefreshCw size={14}/>} Check now</button>
      <button className="watchBtn ghost" onClick={()=>onToggle(it.investigation_id,false)} aria-label={`Stop watching ${c?.name||""}`}><StarOff size={14}/> Unwatch</button>
     </div>})}</section>

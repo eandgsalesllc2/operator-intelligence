@@ -59,7 +59,7 @@ export default function Dashboard(){
  // ---- URL <-> view: "/" case files, "/networks", "/case/<id>?tab=…" (shareable, Back/Forward work) ----
  const TABS=["graph","evidence","timeline","profile","marketing"];
  const [watch,setWatch]=useState<WatchData|null>(null);
- const loadWatch=useCallback(()=>fetch("/api/watchlist",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(d&&!d.error)setWatch(d)}).catch(()=>{}),[]);
+ const loadWatch=useCallback(()=>{const empty={items:[],changes:[],unread:0,seenAt:null,weeklyScheduled:false};return fetch("/api/watchlist",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>setWatch(d&&!d.error?d:w=>w||empty)).catch(()=>setWatch(w=>w||empty))},[]);
  useEffect(()=>{loadWatch()},[loadWatch]);
  const watched=useMemo(()=>new Set((watch?.items||[]).map(i=>i.investigation_id)),[watch]);
  const toggleWatch=useCallback(async(id:string,on:boolean)=>{
