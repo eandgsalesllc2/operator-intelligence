@@ -42,3 +42,15 @@ export function compact(n:number|null|undefined,prefix=""){
 }
 
 export const currencySymbol=(c?:string)=>({USD:"$",EUR:"€",GBP:"£",CAD:"CA$",AUD:"A$"} as Record<string,string>)[c||"USD"]||((c||"")+" ");
+
+// Subscription-focused brands: a subscription app on the store, or subscribe-and-save offers in ads.
+export const SUB_TAKE_RATE=0.7;
+export function subscriptionFor(m:Metrics|undefined,subscriptionApp?:string|null,offers?:string[]):Metrics["subscription"]{
+ const signals:string[]=[];
+ const app=(subscriptionApp||"").trim();
+ if(app&&!/^(none|null|n\/a)$/i.test(app))signals.push(`subscription app: ${app}`);
+ const subOffers=(offers||[]).filter(o=>/subscri|auto-?ship|monthly (plan|supply)/i.test(o));
+ if(subOffers.length)signals.push("subscription offers in ads: "+subOffers.slice(0,2).join("; "));
+ const r=m?.revenue;
+ return {focused:signals.length>0,signals,takeRate:SUB_TAKE_RATE,mrr:signals.length&&r?{low:Math.round(r.low*SUB_TAKE_RATE),mid:Math.round(r.mid*SUB_TAKE_RATE),high:Math.round(r.high*SUB_TAKE_RATE)}:null};
+}

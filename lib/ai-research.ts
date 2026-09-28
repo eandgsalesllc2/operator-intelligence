@@ -170,3 +170,22 @@ class ClaudeResearchProvider implements ResearchProvider{
 
 export const claudeResearch=new ClaudeResearchProvider();
 export type {Draft};
+
+// Short acquisition-strategy summary from the marketing data already pulled (no web access).
+const StrategySchema=z.object({
+ summary:z.string().describe("2–3 sentences: how the brand acquires customers, grounded only in the data given"),
+ channels:z.array(z.string()),angles:z.array(z.string()),offers:z.array(z.string()),audience:z.array(z.string()),creative_style:z.array(z.string()),
+ scale:z.enum(["very high","high","medium","low","minimal"]).describe("Ad scale from active Meta ad count: very high ≥300, high 100–299, medium 30–99, low 5–29, minimal <5"),
+ compliance_flags:z.array(z.string()).describe("Only issues visible in the data, e.g. persona/doctor pages, disease claims, fake urgency"),
+});
+export async function writeStrategy(brand:string,data:unknown):Promise<import("./profile").Marketing["strategy"]|null>{
+ if(!aiResearchEnabled())return null;
+ const client=new Anthropic();
+ const r=await client.messages.parse({
+  model:MODEL,max_tokens:3000,output_config:{effort:"low",format:zodOutputFormat(StrategySchema)},
+  system:"You summarise a DTC brand's media-buying strategy for an analyst. Use only the JSON data provided. Keep list items short (2–5 words). Do not guess spend; EU spend and reach cover only ads shown in the EU.",
+  messages:[{role:"user",content:`Brand: ${brand}\n\nDATA:\n${JSON.stringify(data).slice(0,12000)}`}],
+ });
+ const s=r.parsed_output;if(!s)return null;
+ return {summary:s.summary,channels:s.channels,angles:s.angles,offers:s.offers,audience:s.audience,creativeStyle:s.creative_style,scale:s.scale,complianceFlags:s.compliance_flags};
+}

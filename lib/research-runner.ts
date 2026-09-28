@@ -1,6 +1,8 @@
 import {Case,NodeType} from "./types";
 import {certs,firstParty,portfolio,providers,ProviderContext,ProviderFinding} from "./providers";
-import {aiResearchEnabled,claudeResearch} from "./ai-research";
+import {aiResearchEnabled,claudeResearch,writeStrategy} from "./ai-research";
+import {pullMarketing} from "./marketing-sources";
+import {subscriptionFor} from "./metrics";
 import {Draft,layout,mergeDraft} from "./case-builder";
 import {cleanDomain,isPublicHostname} from "./net";
 import {getInvestigation,matchIdentifiers,saveInvestigation,saveProviderFindings,updateResearchJob} from "./repository";
@@ -99,6 +101,9 @@ export async function runResearchJob(job:any){
   if(!seedNode)throw new Error("Investigation has no seed entity");
   const domain=domainFor(c,job.seed_value,seedType);
   const ctx:ProviderContext={seedValue:job.seed_value,seedType,domain,investigationId:c.id,log:m=>log(m)};
+  // Traffic, ads and landing pages (BrandSearch + Atria) run alongside everything else.
+  const brandName=/\.[a-z]{2,}$/i.test(c.name)?"":c.name;
+  const marketingP=domain?pullMarketing(domain,brandName).catch(()=>null):Promise.resolve(null);
   const active=providers.filter(p=>p.supports(ctx));
   const drafts:Draft[]=[];const notes:string[]=[];let findingsTotal=0;const found:NonNullable<Profile["identifiers"]>[]=[];
   let done=0;
@@ -142,7 +147,7 @@ export async function runResearchJob(job:any){
   }
   let merged:Case={...c,profile};
   for(const d of drafts)merged=mergeDraft(merged,d,seedNode.id);
-  let aiError="";
+  let aiError="";let storeDomain="";
   if(aiResearchEnabled()){
    await log("Starting web research",45);
    const pre={nodes:drafts.flatMap(d=>d.nodes),evidence:drafts.flatMap(d=>d.evidence)} as Draft;
@@ -164,9 +169,30 @@ export async function runResearchJob(job:any){
       catch(e){notes.push(`${p.label} (${store}): failed — ${e instanceof Error?e.message:"error"}`)}
      }
      if(!c.domain||cleanDomain(c.domain)===domain){merged={...merged,domain:store};notes.push(`Store domain is ${store}; the investigation now uses it.`)}
+     storeDomain=store;
     }
    }catch(e){aiError=e instanceof Error?e.message:"error";notes.push(`${claudeResearch.label}: failed — ${aiError}`);console.error("web research failed",e)}
   }
+  // Marketing: prefer the store domain's data when research found a different store.
+  try{
+   await log("Adding traffic, ads and landing pages",92);
+   let mp=await marketingP;
+   const empty=(x:typeof mp)=>!x||(x.metrics?.monthlyVisits==null&&!x.marketing?.landing?.landingPages?.length);
+   if(storeDomain){const sp=await pullMarketing(storeDomain,brandName).catch(()=>null);if(!empty(sp))mp=sp}
+   for(const r of mp?.reports||[])notes.push(`${r.source==="brandsearch"?"BrandSearch":"Atria"}: ${r.note}`);
+   if(mp?.marketing){
+    const m={...(merged.marketing||{}),...mp.marketing};
+    if(m.meta||m.landing||m.tiktok||m.email){
+     const strategy=await writeStrategy(merged.name,{meta:m.meta,tiktok:m.tiktok,instagram:m.instagram,email:m.email,landing:m.landing&&{kindMix:m.landing.kindMix,hosts:m.landing.hosts,pages:m.landing.landingPages?.slice(0,12).map(l=>({path:(l.host||"")+(l.path||""),kind:l.kind,ads:l.activeAds,headline:l.headline,runBy:l.pages}))},topCopy:(mp as any).topCopy}).catch(()=>null);
+     if(strategy)m.strategy=strategy;
+    }
+    merged={...merged,marketing:m};
+   }
+   if(mp?.metrics?.monthlyVisits!=null||(mp?.metrics&&!merged.metrics?.monthlyVisits)){
+    const met=mp!.metrics!;
+    merged={...merged,metrics:{...met,subscription:subscriptionFor(met,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers)}};
+   }
+  }catch(e){notes.push("Marketing data failed: "+(e instanceof Error?e.message:"error"))}
   if(!aiResearchEnabled()||merged.summary===c.summary)merged={...merged,summary:describe(merged,seedNode.id,job.seed_value)};
   const added=merged.nodes.length-c.nodes.length, newEvidence=merged.evidence.length-c.evidence.length;
   const today=new Date().toISOString().slice(0,10);
