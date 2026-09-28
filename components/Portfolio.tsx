@@ -9,14 +9,14 @@ import SiteLink from "./SiteLink";
 // Every investigation as a case-file card. Uses the sidebar's category/flag/search filters, adds sorting and quick flags.
 const OWN:Record<string,{t:string;tone:string}>={identified:{t:"OWNER IDENTIFIED",tone:"ok"},legal_entity_only:{t:"LEGAL ENTITY ONLY",tone:"warn"},operator_unknown:{t:"OPERATOR UNKNOWN",tone:"bad"},contested:{t:"CONTESTED",tone:"bad"}};
 const QUICK=[
- ["all","All","Every brand in this view."],
- ["persona-ads","Persona ads","Brands whose Meta ads run largely through non-brand pages — “doctor”, persona or creator pages carrying 25%+ of active ads, 3+ such pages live, or research flagging fake doctor pages."],
- ["subscription","Subscription","Brands that sell on subscription: recurring Shopify selling plans on the store, a subscription app, or subscribe-and-save ads. These show estimated MRR."],
- ["lawsuit","Lawsuits","At least one lawsuit on record — court cases, class actions, trademark or domain (UDRP) disputes."],
- ["regulatory","Regulatory","Action by a regulator on record — FDA warning letters, FTC or state attorney-general cases, seizures."],
- ["ownership:operator_unknown","Operator unknown","No legal entity or operator identified yet — the store doesn't say who runs it and research hasn't found them."],
- ["network:*","In a network","Brands that share a parent company or operator group with at least one other brand in BrandTracer."],
- ["needs-deep-dive","Needs deep dive","Ownership isn't settled — research left open questions worth a closer look (registries, trademarks, shared IDs)."],
+ ["all","All","Every brand"],
+ ["persona-ads","Persona ads","Ads run mainly through doctor or persona pages"],
+ ["subscription","Subscription","Sells on subscription (shows MRR)"],
+ ["lawsuit","Lawsuits","Has a lawsuit on record"],
+ ["regulatory","Regulatory","Has FDA, FTC or other regulator action"],
+ ["ownership:operator_unknown","Operator unknown","Nobody identified behind the brand yet"],
+ ["network:*","In a network","Shares an owner with other brands"],
+ ["needs-deep-dive","Needs deep dive","Ownership still has open questions"],
 ] as const;
 const SORTS={visits:"Traffic",revenue:"Est. revenue",ads:"Active ads",name:"Name"} as const;
 const caseNo=(id:string)=>{let h=7;for(const ch of id)h=(h*33+ch.charCodeAt(0))>>>0;return String(h%10000).padStart(4,"0")};
