@@ -280,7 +280,7 @@ class PortfolioProvider implements ResearchProvider{
    const rel=m.relations[0];
    addEdge(d,{from:m.from,to:brandKey,label:rel?rel.label:"CORRELATION",confidence:rel&&rel.confidence!=="confirmed"?rel.confidence:rel?"strong":"correlation"});
    addEvidence(d,{title:`Appears in investigation “${m.investigation.name}”`,source:`/investigations/${m.investigation.id}`,confidence:"correlation",note:`${m.entity.label} is recorded there as a ${m.entity.type} (${m.entity.confidence})${rel?`, linked by ${rel.label}`:""}. Review that case's evidence before treating this as ownership.`});
-   findings.push({title:m.investigation.name,url:`/investigations/${m.investigation.id}`,publisher:"Operator Intelligence",snippet:`${m.entity.label} (${m.entity.type})`,sourceType:"portfolio",entities:[],claims:[]});
+   findings.push({title:m.investigation.name,url:`/investigations/${m.investigation.id}`,publisher:"BrandTracer",snippet:`${m.entity.label} (${m.entity.type})`,sourceType:"portfolio",entities:[],claims:[]});
   }
   return {findings,draft:d,notes:[`${seenCases.size} matches in existing investigations`]};
  }

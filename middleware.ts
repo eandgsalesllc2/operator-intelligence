@@ -21,7 +21,7 @@ export async function middleware(req:NextRequest){
  if(session)return NextResponse.next();
  const isApi=pathname.startsWith("/api/");
  if(isApi&&await validApiToken(req))return NextResponse.next();
- if(isApi)return NextResponse.json({error:"Sign in to use Operator Intelligence."},{status:401});
+ if(isApi)return NextResponse.json({error:"Sign in to use BrandTracer."},{status:401});
  const to=new URL("/login",req.url);
  if(pathname!=="/")to.searchParams.set("next",pathname+search);
  return NextResponse.redirect(to);
