@@ -116,7 +116,11 @@ async function fromAtria(domain:string,brandName:string){
  const linksHere=(ads:any[])=>ads.some(a=>hostOf(a.link_url||"").endsWith(root));
  // Keep only brands whose site is this domain, or whose ads link to it (name matches alone are not enough).
  const verified:any[]=[];
- const ranked=[...cands.values()].sort((a,b)=>(b.ad_num||0)-(a.ad_num||0)).slice(0,6);
+ // Multi-word keywords match any word, so rank by how well the name matches before ad volume.
+ const norm=(x:string)=>x.toLowerCase().replace(/[^a-z0-9]/g,"");
+ const want=[stem,...words.map(norm)].filter(w=>w.length>=3);
+ const score=(b:any)=>{const n=norm(b.name||"");return want.some(w=>n===w)?3:want.some(w=>n.startsWith(w)||w.startsWith(n)&&n.length>=4)?2:want.some(w=>n.includes(w))?1:0};
+ const ranked=[...cands.values()].map(b=>({b,s:score(b)})).filter(x=>x.s>0).sort((x,y)=>y.s-x.s||(y.b.ad_num||0)-(x.b.ad_num||0)).slice(0,6).map(x=>x.b);
  await Promise.all(ranked.map(async b=>{
   if(b.website_url&&hostOf(b.website_url).endsWith(root)){verified.push(b);return}
   const r=await settle(atria(`/brand-library/${encodeURIComponent(b.id)}/ads`,{status:["active"],order:"most_impressions",page_size:10}));
