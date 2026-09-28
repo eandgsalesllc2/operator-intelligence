@@ -13,7 +13,8 @@ async function db(path:string,init?:RequestInit){
  if(!url||!k)throw new Error("Database is not configured");
  const r=await fetch(url+"/rest/v1/"+path,{...init,headers:{apikey:k,Authorization:"Bearer "+k,"Content-Type":"application/json",Prefer:"return=representation",...(init?.headers||{})},cache:"no-store"});
  if(!r.ok)throw new Error(await r.text());
- return r.status===204?null:r.json();
+ const text=await r.text(); // "return=minimal" writes come back with an empty body
+ return text?JSON.parse(text):null;
 }
 const inList=(ids:string[])=>`(${ids.map(x=>`"${x.replace(/"/g,"")}"`).join(",")})`;
 

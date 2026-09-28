@@ -11,7 +11,7 @@ export default function AdminPanel(){
  useEffect(()=>{load()},[]);
  const patch=async(id:string,body:object)=>{setBusy(id);setErr("");const r=await fetch("/api/admin/users",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,...body})});const d=await r.json();if(!r.ok)setErr(d.error||"Update failed");await load();setBusy("")};
  const resetLink=async(id:string)=>{setBusy(id);setCopied(false);const r=await fetch("/api/admin/resets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId:id})});const d=await r.json();if(!r.ok)setErr(d.error||"Could not create a link");else setLink({id,url:d.link});setBusy("")};
- if(!data)return <main className="adminWrap"><p className="pfEmpty">{err||<><Loader2 size={16} className="spin"/> Loading accounts…</>}</p></main>;
+ if(!data)return <div className="adminWrap"><p className="pfEmpty">{err||<><Loader2 size={16} className="spin"/> Loading accounts…</>}</p></div>;
  const pending=data.users.filter(u=>u.status==="pending"),rest=data.users.filter(u=>u.status!=="pending");
  const row=(u:U)=><tr key={u.id}>
   <td><b>{u.full_name}</b><div className="dim small">{u.email}</div><div className="dim small">{u.job_role} · {u.company}</div></td>
@@ -27,7 +27,7 @@ export default function AdminPanel(){
    {u.status==="approved"&&<button disabled={busy===u.id} onClick={()=>resetLink(u.id)} className={u.resetRequested?"hot":""}><KeyRound size={14}/> {u.resetRequested?"Reset requested · get link":"Reset link"}</button>}
    {link?.id===u.id&&<div className="resetLink"><input readOnly value={link.url} aria-label="Password reset link" onFocus={e=>e.target.select()}/><button onClick={()=>{navigator.clipboard?.writeText(link.url);setCopied(true)}}><Copy size={14}/> {copied?"Copied":"Copy"}</button><span className="dim small">Works once, for 60 minutes. Send it to {u.email} yourself.</span></div>}
   </td></tr>;
- return <main className="adminWrap">
+ return <div className="adminWrap">
   <a href="/" className="backLink"><ArrowLeft size={15}/> Back to case files</a>
   <div className="pfKicker">ADMIN</div><h1 className="adminTitle">Access &amp; accounts</h1>
   <p className="dim">New sign-ups wait here until you approve them. Members can run {data.defaultLimit} research jobs a day unless you set their own limit; owners and admins are unlimited.</p>
@@ -36,5 +36,5 @@ export default function AdminPanel(){
   {pending.length?<div className="tableWrap"><table className="ptable adminTable"><thead><tr><th>Person</th><th>Use</th><th>Status</th><th>Research</th><th>Joined</th><th>Actions</th></tr></thead><tbody>{pending.map(row)}</tbody></table></div>:<p className="dim">Nobody is waiting.</p>}
   <h2 className="adminH2">All accounts · {rest.length}</h2>
   <div className="tableWrap"><table className="ptable adminTable"><thead><tr><th>Person</th><th>Use</th><th>Status</th><th>Research</th><th>Joined</th><th>Actions</th></tr></thead><tbody>{rest.map(row)}</tbody></table></div>
- </main>;
+ </div>;
 }

@@ -18,7 +18,7 @@ async function db(path:string,init?:RequestInit){
  if(!url||!k)throw new Error("Database is not configured");
  const r=await fetch(url+"/rest/v1/"+path,{...init,headers:{apikey:k,Authorization:"Bearer "+k,"Content-Type":"application/json",Prefer:"return=representation",...(init?.headers||{})},cache:"no-store"});
  if(!r.ok)throw new Error(await r.text());
- return r.status===204?null:r.json();
+ return (async()=>{const t=await r.text();return t?JSON.parse(t):null})();
 }
 
 export async function hashPassword(password:string){
