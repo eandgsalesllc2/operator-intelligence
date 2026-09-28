@@ -4,6 +4,7 @@
 import {getInvestigation,matchIdentifiers,refreshMarketing} from "./repository";
 import {pullMarketing} from "./marketing-sources";
 import {subscriptionFor} from "./metrics";
+import {detectSellingPlans} from "./selling-plans";
 import {identifierRows,STRONG_KINDS,KIND_LABEL,type Marketing} from "./profile";
 import type {Metrics} from "./metrics";
 
@@ -16,11 +17,11 @@ async function db(path:string,init?:RequestInit){
 }
 const inList=(ids:string[])=>`(${ids.map(x=>`"${x.replace(/"/g,"")}"`).join(",")})`;
 
-export type Snapshot={visits:number|null;activeAds:number|null;totalAds:number|null;landing:{key:string;kind:string;ads:number}[];persona:{name:string;active:number}[];linked:{id:string;name:string;kinds:string[]}[]};
+export type Snapshot={subscription?:boolean;visits:number|null;activeAds:number|null;totalAds:number|null;landing:{key:string;kind:string;ads:number}[];persona:{name:string;active:number}[];linked:{id:string;name:string;kinds:string[]}[]};
 export type Change={kind:string;severity:"info"|"notable"|"major";title:string;detail?:string};
 
 function snapshotOf(metrics:Metrics|undefined|null,m:Marketing|undefined|null,linked:Snapshot["linked"]):Snapshot{
- return {visits:metrics?.monthlyVisits??null,activeAds:m?.meta?.activeAds??metrics?.metaActiveAds??null,totalAds:m?.meta?.totalAds??metrics?.metaTotalAds??null,
+ return {subscription:!!metrics?.subscription?.focused,visits:metrics?.monthlyVisits??null,activeAds:m?.meta?.activeAds??metrics?.metaActiveAds??null,totalAds:m?.meta?.totalAds??metrics?.metaTotalAds??null,
   landing:(m?.landing?.landingPages||[]).filter(l=>l.status!=="inactive").map(l=>({key:`${l.host||""}${l.path||""}`,kind:l.kind||"",ads:l.activeAds||0})),
   persona:(m?.meta?.pages||[]).filter(p=>p.persona).map(p=>({name:p.name,active:p.activeAds||0})),linked};
 }
@@ -40,6 +41,8 @@ export function diff(prev:Snapshot,next:Snapshot):Change[]{
   if(Math.abs(d)>=20&&Math.abs(p)>=30)out.push({kind:"ads_change",severity:Math.abs(p)>=100?"major":"notable",title:`Active Meta ads ${d>0?"up":"down"} ${Math.abs(p)}%`,detail:`${prev.activeAds.toLocaleString()} → ${next.activeAds.toLocaleString()}`});}
  if(prev.visits&&next.visits&&prev.visits>=5000){const p=pct(next.visits,prev.visits);
   if(Math.abs(p)>=25)out.push({kind:"traffic_change",severity:Math.abs(p)>=60?"major":"notable",title:`Monthly visits ${p>0?"up":"down"} ${Math.abs(p)}%`,detail:`${prev.visits.toLocaleString()} → ${next.visits.toLocaleString()}`});}
+ if(prev.subscription===false&&next.subscription)out.push({kind:"subscription_on",severity:"notable",title:"Started selling on subscription",detail:"Selling plans now on the store"});
+ if(prev.subscription&&next.subscription===false)out.push({kind:"subscription_off",severity:"notable",title:"Subscription plans no longer found on the store"});
  const pk=new Set(prev.linked.map(x=>x.id));
  for(const x of next.linked)if(!pk.has(x.id))out.push({kind:"link_new",severity:"major",title:`Now linked to ${x.name}`,detail:`Shares ${x.kinds.join(", ")} — a lead, not proof of ownership`});
  return out;
@@ -59,17 +62,20 @@ export async function checkInvestigation(id:string):Promise<{changes:Change[];ch
  const c=await getInvestigation(id);if(!c)return {changes:[],checked:false,note:"Investigation not found"};
  const prevSnap=await lastSnapshot(id);
  const prev=prevSnap?.data||snapshotOf(c.metrics,c.marketing,await linkedCases(c).catch(()=>[]));
- let metrics=c.metrics,marketing=c.marketing;
+ let metrics=c.metrics,marketing=c.marketing,profile=c.profile;
  if(c.domain){
+  const plans=await detectSellingPlans(c.domain).catch(()=>null);
+  if(plans)profile={...(c.profile||{}),identifiers:{...(c.profile?.identifiers||{}),sellingPlans:plans}};
   const mp=await pullMarketing(c.domain,/\.[a-z]{2,}$/i.test(c.name)?"":c.name).catch(()=>null);
   if(mp?.marketing)marketing={...(c.marketing||{}),...mp.marketing,strategy:c.marketing?.strategy??mp.marketing.strategy};
-  if(mp?.metrics&&mp.metrics.monthlyVisits!=null)metrics={...mp.metrics,subscription:subscriptionFor(mp.metrics,c.profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers)};
+  if(mp?.metrics&&mp.metrics.monthlyVisits!=null)metrics={...mp.metrics,subscription:subscriptionFor(mp.metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans)};
  }
+ if(metrics&&metrics===c.metrics&&profile!==c.profile)metrics={...metrics,subscription:subscriptionFor(metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans)};
  const next=snapshotOf(metrics,marketing,await linkedCases({...c,marketing}).catch(()=>prev.linked));
  const changes=diff(prev,next);
  if(changes.length)await db("oi_watch_changes",{method:"POST",body:JSON.stringify(changes.map(x=>({investigation_id:id,...x})))});
  await db("oi_watch_snapshots",{method:"POST",body:JSON.stringify({investigation_id:id,data:next})});
- if(metrics!==c.metrics||marketing!==c.marketing)await refreshMarketing({...c,metrics,marketing});
+ if(metrics!==c.metrics||marketing!==c.marketing||profile!==c.profile)await refreshMarketing({...c,metrics,marketing,profile});
  return {changes,checked:true};
 }
 

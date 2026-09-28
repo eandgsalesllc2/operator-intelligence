@@ -3,6 +3,7 @@ import {certs,firstParty,portfolio,providers,ProviderContext,ProviderFinding} fr
 import {aiResearchEnabled,claudeResearch,writeStrategy} from "./ai-research";
 import {pullMarketing} from "./marketing-sources";
 import {subscriptionFor} from "./metrics";
+import {detectSellingPlans} from "./selling-plans";
 import {Draft,layout,mergeDraft} from "./case-builder";
 import {cleanDomain,isPublicHostname} from "./net";
 import {getInvestigation,matchIdentifiers,saveInvestigation,saveProviderFindings,updateResearchJob} from "./repository";
@@ -108,6 +109,7 @@ export async function runResearchJob(job:any){
   // Traffic, ads and landing pages (BrandSearch + Atria) run alongside everything else.
   const brandName=/\.[a-z]{2,}$/i.test(c.name)?"":c.name;
   const marketingP=domain?pullMarketing(domain,brandName).catch(()=>null):Promise.resolve(null);
+  const plansP=domain?detectSellingPlans(domain).catch(()=>null):Promise.resolve(null);
   const active=providers.filter(p=>p.supports(ctx));
   const drafts:Draft[]=[];const notes:string[]=[];let findingsTotal=0;const found:NonNullable<Profile["identifiers"]>[]=[];
   let done=0;
@@ -183,6 +185,8 @@ export async function runResearchJob(job:any){
   try{
    await log("Adding traffic, ads and landing pages",92);
    let mp=await marketingP;
+   let plans=await plansP;if(storeDomain&&!plans)plans=await detectSellingPlans(storeDomain).catch(()=>null);
+   if(plans)merged={...merged,profile:{...(merged.profile||{}),identifiers:{...(merged.profile?.identifiers||{}),sellingPlans:plans}}};
    const empty=(x:typeof mp)=>!x||(x.metrics?.monthlyVisits==null&&!x.marketing?.landing?.landingPages?.length);
    if(storeDomain){const sp=await pullMarketing(storeDomain,brandName).catch(()=>null);if(!empty(sp))mp=sp}
    for(const r of mp?.reports||[])notes.push(`${r.source==="brandsearch"?"BrandSearch":"Atria"}: ${r.note}`);
@@ -196,8 +200,9 @@ export async function runResearchJob(job:any){
    }
    if(mp?.metrics?.monthlyVisits!=null||(mp?.metrics&&!merged.metrics?.monthlyVisits)){
     const met=mp!.metrics!;
-    merged={...merged,metrics:{...met,subscription:subscriptionFor(met,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers)}};
+    merged={...merged,metrics:{...met,subscription:subscriptionFor(met,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers,merged.profile?.identifiers?.sellingPlans)}};
    }
+   if(merged.metrics&&merged.profile?.identifiers?.sellingPlans)merged={...merged,metrics:{...merged.metrics,subscription:subscriptionFor(merged.metrics,merged.profile?.identifiers?.subscriptionApp,merged.marketing?.strategy?.offers,merged.profile.identifiers.sellingPlans)}};
   }catch(e){notes.push("Marketing data failed: "+(e instanceof Error?e.message:"error"))}
   if(!aiResearchEnabled()||merged.summary===c.summary)merged={...merged,summary:describe(merged,seedNode.id,job.seed_value)};
   const added=merged.nodes.length-c.nodes.length, newEvidence=merged.evidence.length-c.evidence.length;

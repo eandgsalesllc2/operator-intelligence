@@ -23,7 +23,7 @@ export type Metrics={
 };
 export const REVENUE_METHOD="Forecast, not reported revenue: monthly visits × conversion (1% / 2% / 3%, halved when the order value is over $150) × average order value (median price of the top-5 bestsellers by rank, ignoring items under $5; ×1 / ×1.3 / ×1.6 for bundles and upsells).";
 
-export const MRR_METHOD="Estimated MRR, not reported: forecast monthly revenue × 70% assumed subscription take rate. Only shown for brands with a subscription signal (a subscription app such as Recharge, Loop or Skio on the store, or subscribe-and-save offers in their ads).";
+export const MRR_METHOD="Estimated MRR, not reported: forecast monthly revenue × 70% assumed subscription take rate. Only shown for brands that sell on subscription — Shopify selling plans on their products, a subscription app such as Recharge, Loop or Skio, or subscribe-and-save offers in their ads.";
 
 export function forecast(visits:number|null|undefined,prices:number[]):{aov:number|null;revenue:Metrics["revenue"]}{
  const p=prices.filter(x=>x>=5).slice(0,5);
@@ -45,8 +45,10 @@ export const currencySymbol=(c?:string)=>({USD:"$",EUR:"€",GBP:"£",CAD:"CA$",
 
 // Subscription-focused brands: a subscription app on the store, or subscribe-and-save offers in ads.
 export const SUB_TAKE_RATE=0.7;
-export function subscriptionFor(m:Metrics|undefined,subscriptionApp?:string|null,offers?:string[]):Metrics["subscription"]{
+export function subscriptionFor(m:Metrics|undefined,subscriptionApp?:string|null,offers?:string[],sellingPlans?:{productsChecked:number;productsWithPlans:number;subscriptionOnly:number;groups:{name:string;plans:string[]}[]}|null):Metrics["subscription"]{
  const signals:string[]=[];
+ // Shopify selling plans on the store are the strongest signal: the brand literally sells on subscription.
+ if(sellingPlans&&sellingPlans.productsWithPlans>0){const g=sellingPlans.groups[0];signals.push(`Shopify selling plans on ${sellingPlans.productsWithPlans} of ${sellingPlans.productsChecked} products checked${sellingPlans.subscriptionOnly?` (${sellingPlans.subscriptionOnly} subscription-only)`:""}${g?` — “${g.name}”${g.plans.length?`: ${g.plans.slice(0,3).join(", ")}`:""}`:""}`)}
  const app=(subscriptionApp||"").trim();
  if(app&&!/^(none|null|n\/a)$/i.test(app))signals.push(`subscription app: ${app}`);
  const subOffers=(offers||[]).filter(o=>/subscri|auto-?ship|monthly (plan|supply)/i.test(o));

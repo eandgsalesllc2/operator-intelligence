@@ -142,8 +142,23 @@ export async function searchAll(q:string):Promise<SearchHit[]>{
 // Update only a case's metrics/marketing (and the tags + identifier index that depend on them) — used by watchlist checks.
 export async function refreshMarketing(c:Case){
  const tags=[...tagsFor(c.profile,c.marketing,/^\[(.+?)\]/.exec(c.summary||"")?.[1]),...(c.metrics?.subscription?.focused?["subscription"]:[])];
- await request("investigations?id=eq."+encodeURIComponent(c.id),{method:"PATCH",body:JSON.stringify({metrics:c.metrics||{},marketing:c.marketing||{},monthly_visits:c.metrics?.monthlyVisits??null,tags,updated_at:new Date().toISOString()})});
+ await request("investigations?id=eq."+encodeURIComponent(c.id),{method:"PATCH",body:JSON.stringify({metrics:c.metrics||{},marketing:c.marketing||{},...(c.profile?{profile:c.profile}:{}),monthly_visits:c.metrics?.monthlyVisits??null,tags,updated_at:new Date().toISOString()})});
  await request("oi_identifiers?investigation_id=eq."+encodeURIComponent(c.id),{method:"DELETE"});
  const rows=identifierRows(c.profile,c.marketing,c.domain);
  if(rows.length)await request("oi_identifiers",{method:"POST",body:JSON.stringify(rows.map(r=>({...r,investigation_id:c.id})))});
+}
+
+// Record Shopify selling plans found on each store and recompute the subscription flag, MRR and tags.
+export async function applySellingPlans(updates:{id:string;plans:import("./selling-plans").SellingPlans}[]){
+ const {subscriptionFor}=await import("./metrics");
+ let changed=0,nowSub=0;
+ for(const u of updates){
+  const r=(await request(`investigations?id=eq.${encodeURIComponent(u.id)}&select=id,summary,profile,marketing,metrics,tags`))?.[0];if(!r)continue;
+  const profile={...(r.profile||{}),identifiers:{...(r.profile?.identifiers||{}),sellingPlans:u.plans}};
+  const metrics=r.metrics&&Object.keys(r.metrics).length?{...r.metrics,subscription:subscriptionFor(r.metrics,profile.identifiers.subscriptionApp,r.marketing?.strategy?.offers,u.plans)}:r.metrics;
+  const tags=[...tagsFor(profile,r.marketing,/^\[(.+?)\]/.exec(r.summary||"")?.[1]),...(metrics?.subscription?.focused?["subscription"]:[])];
+  await request("investigations?id=eq."+encodeURIComponent(u.id),{method:"PATCH",body:JSON.stringify({profile,metrics,tags})});
+  changed++;if(metrics?.subscription?.focused)nowSub++;
+ }
+ return {changed,subscription:nowSub};
 }

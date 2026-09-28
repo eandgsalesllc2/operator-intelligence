@@ -9,6 +9,7 @@ export type Profile={
   googleAnalytics?:string[];googleTagManager?:string[];googleAds?:string[];metaPixel?:string[];tiktokPixel?:string[];clarity?:string[];klaviyo?:string[];otherTracking?:string[];
   checkoutVendor?:string|null;checkoutAccount?:string|null;subscriptionApp?:string|null;paymentIds?:string[];amazonSellers?:string[];cardDescriptors?:string[];
   supportEmails?:string[];phones?:string[];relatedDomains?:RelatedDomain[];
+  sellingPlans?:import("./selling-plans").SellingPlans|null;
  };
  entities?:{name:string;role?:string;jurisdiction?:string|null;fileNumber?:string|null;formed?:string|null;status?:string;registeredAgent?:string|null;officers?:{name:string;role?:string;confidence?:string}[];confidence?:string;source?:string|null}[];
  trademarks?:{mark:string;serial?:string|null;registration?:string|null;owner?:string|null;status?:string;filed?:string|null;firstUse?:string|null;attorney?:string|null;classes?:string|null}[];
