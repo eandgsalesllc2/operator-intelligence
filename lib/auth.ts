@@ -93,17 +93,17 @@ export async function updateUser(id:string,patch:Partial<Pick<User,"status"|"rol
 
 // ---------- password reset ----------
 const sha=(v:string)=>createHash("sha256").update(v).digest("hex");
-export async function createResetToken(userId:string){
+export async function createResetToken(userId:string,hours=1){
  await db(`oi_password_resets?user_id=eq.${encodeURIComponent(userId)}&used_at=is.null`,{method:"PATCH",body:JSON.stringify({used_at:new Date().toISOString()})}); // one live link per user
  const token=randomBytes(32).toString("base64url");
- await db("oi_password_resets",{method:"POST",body:JSON.stringify({user_id:userId,token_hash:sha(token),expires_at:new Date(Date.now()+60*60e3).toISOString()})});
+ await db("oi_password_resets",{method:"POST",body:JSON.stringify({user_id:userId,token_hash:sha(token),expires_at:new Date(Date.now()+hours*60*60e3).toISOString()})});
  return token;
 }
 export async function pendingResetRequests(){return await db("oi_password_resets?used_at=is.null&expires_at=gt."+encodeURIComponent(new Date().toISOString())+"&select=user_id,created_at,expires_at&order=created_at.desc")}
-export async function resetPassword(token:string,password:string):Promise<{ok?:true;error?:string}>{
+export async function resetPassword(token:string,password:string,acceptedTerms=false):Promise<{ok?:true;error?:string}>{
  const rows=await db(`oi_password_resets?token_hash=eq.${sha(token)}&select=id,user_id,expires_at,used_at&limit=1`);const r=rows?.[0];
  if(!r||r.used_at||new Date(r.expires_at).getTime()<Date.now())return {error:"This reset link has expired or was already used. Ask for a new one."};
- await db(`oi_users?id=eq.${r.user_id}`,{method:"PATCH",body:JSON.stringify({password_hash:await hashPassword(password),failed_logins:0,locked_until:null})});
+ await db(`oi_users?id=eq.${r.user_id}`,{method:"PATCH",body:JSON.stringify({password_hash:await hashPassword(password),failed_logins:0,locked_until:null,...(acceptedTerms?{accepted_terms_at:new Date().toISOString()}:{})})});
  await db(`oi_password_resets?id=eq.${r.id}`,{method:"PATCH",body:JSON.stringify({used_at:new Date().toISOString()})});
  return {ok:true};
 }
@@ -118,4 +118,17 @@ export async function researchCountToday(userId:string){
  const url=process.env.SUPABASE_URL,k=process.env.SUPABASE_SERVICE_ROLE_KEY;
  const r=await fetch(`${url}/rest/v1/oi_research_jobs?user_id=eq.${encodeURIComponent(userId)}&created_at=gte.${encodeURIComponent(since.toISOString())}&select=id`,{headers:{apikey:k!,Authorization:"Bearer "+k,Prefer:"count=exact",Range:"0-0"},cache:"no-store"});
  return Number(r.headers.get("content-range")?.split("/")[1]||0);
+}
+
+// Admin-created account: approved from the start, with an unusable random password until the person sets their own
+// through a 7-day setup link (the admin never sees or chooses a password).
+export async function adminCreateUser(u:{email:string;full_name:string;company:string;job_role:string;role:"member"|"admin";createdBy:string}):Promise<{user:User;token:string}>{
+ const rows=await db(`oi_users?select=${PUBLIC_FIELDS}`,{method:"POST",body:JSON.stringify({email:normalizeEmail(u.email),password_hash:await hashPassword(randomBytes(32).toString("base64url")),full_name:u.full_name,company:u.company,job_role:u.job_role,use_case:`Account created by an admin (${u.createdBy})`,status:"approved",role:u.role})});
+ const user=rows[0] as User;
+ return {user,token:await createResetToken(user.id,24*7)};
+}
+export async function sendInviteEmail(to:string,name:string,link:string,inviter:string){
+ const key=process.env.RESEND_API_KEY,from=process.env.RESET_FROM_EMAIL;if(!key||!from)return false;
+ const r=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+key,"Content-Type":"application/json"},body:JSON.stringify({from,to,subject:"You're invited to BrandTracer",text:`Hi ${name.split(" ")[0]||"there"},\n\n${inviter} created a BrandTracer account for you.\n\nSet your password and sign in here (the link works once, for 7 days):\n${link}\n`})});
+ return r.ok;
 }

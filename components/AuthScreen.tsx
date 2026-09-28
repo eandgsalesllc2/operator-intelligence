@@ -4,7 +4,7 @@ import {ArrowRight,Eye,EyeOff,Loader2,ShieldCheck,Search,Megaphone} from "lucide
 
 const ROLES=["Founder / owner","Media buyer","Marketing","Investor / M&A","Legal / compliance","Research / analyst","Agency","Other"];
 
-export default function AuthScreen({mode,next,token}:{mode:"login"|"signup"|"forgot"|"reset";next?:string;token?:string}){
+export default function AuthScreen({mode,next,token,invite}:{mode:"login"|"signup"|"forgot"|"reset";next?:string;token?:string;invite?:boolean}){
  const signup=mode==="signup",forgot=mode==="forgot",reset=mode==="reset";
  const [done,setDone]=useState("");
  const [f,setF]=useState({email:"",password:"",fullName:"",company:"",role:"",useCase:"",acceptTerms:false});
@@ -14,7 +14,7 @@ export default function AuthScreen({mode,next,token}:{mode:"login"|"signup"|"for
   e.preventDefault();setBusy(true);setError("");
   try{
    const url=signup?"/api/auth/signup":forgot?"/api/auth/forgot":reset?"/api/auth/reset":"/api/auth/login";
-   const body=signup?f:forgot?{email:f.email}:reset?{token,password:f.password}:{email:f.email,password:f.password};
+   const body=signup?f:forgot?{email:f.email}:reset?{token,password:f.password,invite:!!invite,acceptTerms:f.acceptTerms}:{email:f.email,password:f.password};
    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
    const d=await r.json().catch(()=>({}));
    if(!r.ok){setError(d.error||"Something went wrong.");setBusy(false);return}
@@ -42,22 +42,23 @@ export default function AuthScreen({mode,next,token}:{mode:"login"|"signup"|"for
   <section className="authPanel">
    {done?<div className="authCard">
     {done==="pending"?<><h2>Request received</h2><p className="dim">Thanks, {f.fullName.split(" ")[0]||"there"}. Your account is waiting for approval — you&apos;ll be able to sign in with {f.email} once an admin approves it.</p></>
-    :done==="reset"?<><h2>Password updated</h2><p className="dim">Your new password is set. Sign in with it now.</p></>
+    :done==="reset"?<><h2>{invite?"You're all set":"Password updated"}</h2><p className="dim">{invite?"Your account is ready. Sign in with your email and new password.":"Your new password is set. Sign in with it now."}</p></>
     :<><h2>Check your email</h2><p className="dim">{done}</p></>}
     <a className="authSubmit" href="/login" style={{textDecoration:"none",color:"#fff7ee"}}>Go to sign in</a>
    </div>:
    <form className="authCard" onSubmit={submit} noValidate>
-    <h2>{signup?"Request access":forgot?"Reset your password":reset?"Choose a new password":"Sign in"}</h2>
-    <p className="dim">{signup?"BrandTracer is invite-and-approve. Tell us who you are and an admin will review your request.":forgot?"Enter your account email and we'll send a reset link.":reset?"Use at least 10 characters, with letters and a number.":"Welcome back. Sign in to your case files."}</p>
+    <h2>{signup?"Request access":forgot?"Reset your password":reset?(invite?"Set up your account":"Choose a new password"):"Sign in"}</h2>
+    <p className="dim">{signup?"BrandTracer is invite-and-approve. Tell us who you are and an admin will review your request.":forgot?"Enter your account email and we'll send a reset link.":reset?(invite?"You've been invited to BrandTracer. Choose a password to finish setting up your account.":"Use at least 10 characters, with letters and a number."):"Welcome back. Sign in to your case files."}</p>
     {signup&&<><label>Full name<input autoComplete="name" value={f.fullName} onChange={set("fullName")} required/></label>
      <label>Company<input autoComplete="organization" value={f.company} onChange={set("company")} required/></label>
      <label>Your role<select value={f.role} onChange={set("role")} required><option value="" disabled>Choose one…</option>{ROLES.map(r=><option key={r}>{r}</option>)}</select></label></>}
     {!reset&&<label>Email<input type="email" autoComplete="email" value={f.email} onChange={set("email")} required/></label>}
     {!forgot&&<label>Password<span className="pw"><input type={show?"text":"password"} autoComplete={signup||reset?"new-password":"current-password"} value={f.password} onChange={set("password")} required minLength={signup?10:undefined}/><button type="button" onClick={()=>setShow(s=>!s)} aria-label={show?"Hide password":"Show password"}>{show?<EyeOff size={16}/>:<Eye size={16}/>}</button></span>{(signup||reset)&&<small className="dim">At least 10 characters, with letters and a number.</small>}{mode==="login"&&<a className="forgotLink" href="/forgot">Forgot password?</a>}</label>}
+    {reset&&invite&&<label className="check"><input type="checkbox" checked={f.acceptTerms} onChange={set("acceptTerms")}/><span>I'll use BrandTracer for business research only — company and business-role information, never private individuals' home addresses, personal contacts or family details.</span></label>}
     {signup&&<><label>What will you use it for?<textarea rows={3} value={f.useCase} onChange={set("useCase")} placeholder="e.g. Vetting competitors and acquisition targets in supplements" required/></label>
      <label className="check"><input type="checkbox" checked={f.acceptTerms} onChange={set("acceptTerms")}/><span>I'll use BrandTracer for business research only — company and business-role information, never private individuals' home addresses, personal contacts or family details.</span></label></>}
     {error&&<div className="authError" role="alert">{error}</div>}
-    <button className="authSubmit" disabled={busy}>{busy?<Loader2 size={16} className="spin"/>:<ArrowRight size={16}/>}{signup?"Request access":forgot?"Send reset link":reset?"Save new password":"Sign in"}</button>
+    <button className="authSubmit" disabled={busy}>{busy?<Loader2 size={16} className="spin"/>:<ArrowRight size={16}/>}{signup?"Request access":forgot?"Send reset link":reset?(invite?"Create my password":"Save new password"):"Sign in"}</button>
     <p className="authSwitch">{forgot||reset?<>Remembered it? <a href="/login">Sign in</a></>:signup?<>Already have an account? <a href={"/login"+(next?`?next=${encodeURIComponent(next)}`:"")}>Sign in</a></>:<>New here? <a href={"/signup"+(next?`?next=${encodeURIComponent(next)}`:"")}>Request access</a></>}</p>
    </form>}
   </section>
