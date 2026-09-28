@@ -11,15 +11,21 @@ export const atriaEnabled=()=>Boolean(process.env.ATRIA_API_KEY);
 
 type Q=Record<string,string|number|boolean|undefined|(string|number)[]>;
 function qs(q:Q){const u=new URLSearchParams();for(const [k,v] of Object.entries(q)){if(v===undefined||v==="")continue;if(Array.isArray(v))v.forEach(x=>u.append(k,String(x)));else u.set(k,String(v))}const s=u.toString();return s?"?"+s:""}
+// Retries rate limits (429) and server errors with backoff; 404 means "no such brand" and returns null.
+const errors:string[]=[];
 async function get(base:string,key:string|undefined,path:string,q:Q={}){
  if(!key)throw new Error("not configured");
- const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),20000);
- try{
-  const r=await fetch(base+path+qs(q),{headers:{"X-API-Key":key,Accept:"application/json"},signal:ctl.signal,cache:"no-store"});
-  if(r.status===404)return null;
-  if(!r.ok)throw new Error(`${r.status} ${(await r.text()).slice(0,160)}`);
-  return await r.json();
- }finally{clearTimeout(t)}
+ for(let attempt=0;;attempt++){
+  const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),20000);
+  try{
+   const r=await fetch(base+path+qs(q),{headers:{"X-API-Key":key,Accept:"application/json"},signal:ctl.signal,cache:"no-store"});
+   if(r.status===404)return null;
+   if((r.status===429||r.status>=500)&&attempt<3){const wait=Math.min(8000,(+(r.headers.get("retry-after")||0)*1000)||1500*2**attempt);await new Promise(res=>setTimeout(res,wait));continue}
+   if(!r.ok){const msg=`${r.status} ${(await r.text()).slice(0,160)}`;errors.push(`${new URL(base).hostname}${path.split("?")[0]}: ${msg}`);throw new Error(msg)}
+   return await r.json();
+  }catch(e){if(ctl.signal.aborted&&attempt<1)continue;throw e}
+  finally{clearTimeout(t)}
+ }
 }
 const bs=(path:string,q?:Q)=>get(BS,process.env.BRANDSEARCH_API_KEY,path,q);
 const atria=(path:string,q?:Q)=>get(ATRIA,process.env.ATRIA_API_KEY,path,q);
@@ -121,11 +127,14 @@ async function fromAtria(domain:string,brandName:string){
  const want=[stem,...words.map(norm)].filter(w=>w.length>=3);
  const score=(b:any)=>{const n=norm(b.name||"");return want.some(w=>n===w)?3:want.some(w=>n.startsWith(w)||w.startsWith(n)&&n.length>=4)?2:want.some(w=>n.includes(w))?1:0};
  const ranked=[...cands.values()].map(b=>({b,s:score(b)})).filter(x=>x.s>0).sort((x,y)=>y.s-x.s||(y.b.ad_num||0)-(x.b.ad_num||0)).slice(0,6).map(x=>x.b);
- await Promise.all(ranked.map(async b=>{
-  if(b.website_url&&hostOf(b.website_url).endsWith(root)){verified.push(b);return}
-  const r=await settle(atria(`/brand-library/${encodeURIComponent(b.id)}/ads`,{status:["active"],order:"most_impressions",page_size:10}));
-  if(linksHere(r?.data?.items||[]))verified.push(b);
- }));
+ const sampled=new Map<string,any[]>();
+ for(const b of ranked){ // one at a time: Atria rate-limits bursts
+  if(b.website_url&&hostOf(b.website_url).endsWith(root)){verified.push(b);continue}
+  const r=await settle(atria(`/brand-library/${encodeURIComponent(b.id)}/ads`,{status:["active"],order:"most_impressions",page_size:20}));
+  const items=r?.data?.items||[];sampled.set(b.id,items);
+  if(linksHere(items))verified.push(b);
+  if(verified.length>=3)break;
+ }
  if(!verified.length)return {note:`No Atria advertiser links to ${root}`};
  verified.sort((a,b)=>(b.ad_num||0)-(a.ad_num||0));
  const main=verified.find(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,"").includes(stem))||verified[0];
@@ -133,6 +142,7 @@ async function fromAtria(domain:string,brandName:string){
   for(let i=0;i<pagesN;i++){const r=await settle(atria(`/brand-library/${encodeURIComponent(b.id)}/ads`,{status:[status],order:status==="active"?"most_impressions":"recently_ended",page_size:50,cursor}));const d=r?.data;if(!d)break;if(i===0)total=d.total||0;out.push(...(d.items||[]));cursor=d.cursor||undefined;if(!cursor)break}
   return {ads:out,total}};
  let {ads:mainAds,total}=await pull(main,"active",2);let status:"active"|"inactive"="active";
+ if(!mainAds.length&&sampled.get(main.id)?.length)mainAds=sampled.get(main.id)!; // fall back to the ads seen while matching
  if(!mainAds.length){status="inactive";mainAds=(await pull(main,"inactive",1)).ads}
  const others=verified.filter(b=>b!==main&&(b.ad_num||0)>=20).slice(0,2);
  const otherAds=(await Promise.all(others.map(b=>pull(b,"active",1)))).flatMap(x=>x.ads).filter(a=>hostOf(a.link_url||"").endsWith(root));
@@ -142,7 +152,7 @@ async function fromAtria(domain:string,brandName:string){
   let url:URL;try{url=new URL(unwrap(a.link_url))}catch{continue}
   const host=bare(url.hostname);const path=url.pathname.replace(/\/+$/,"")||"/";const key=host+path;
   const g=groups.get(key)||{url:`https://${host}${path==="/"?"":path}`,host,path,kind:classify(host,path,host.endsWith(root),String(a.title||"")),activeAds:0,bestRank:null as number|null,maxDaysRunning:0,pages:new Set<string>(),headline:a.title||null,status};
-  g.activeAds++;const rk=num(a.impression_rank?.best?.rank)??num(a.impression_rank?.current?.rank)??num(a.impression_rank?.rank);if(rk!=null&&(g.bestRank==null||rk<g.bestRank))g.bestRank=rk;
+  g.activeAds++;const rk=num(a.impression_rank?.peak_rank?.rank)??num(a.impression_rank?.latest_rank?.rank)??num(a.impression_rank?.best?.rank);if(rk!=null&&(g.bestRank==null||rk<g.bestRank))g.bestRank=rk;
   g.maxDaysRunning=Math.max(g.maxDaysRunning,num(a.days_running)??0);if(a.brand_name)g.pages.add(String(a.brand_name));groups.set(key,g);
  }
  const landingPages=[...groups.values()].sort((a,b)=>b.activeAds-a.activeAds||(a.bestRank??1e9)-(b.bestRank??1e9)).slice(0,25).map(g=>({...g,pages:[...g.pages]}));
@@ -159,7 +169,7 @@ async function fromAtria(domain:string,brandName:string){
 
 // Pulls both sources in parallel. brandName helps Atria find the advertiser (it searches by name).
 export async function pullMarketing(domain:string,brandName:string):Promise<MarketingPull>{
- const reports:SourceReport[]=[];
+ const reports:SourceReport[]=[];errors.length=0;
  if(!domain)return {reports};
  const [b,a]=await Promise.all([
   brandsearchEnabled()?fromBrandsearch(domain).catch(e=>({note:"failed: "+(e instanceof Error?e.message:"error"),topCopy:[] as string[]})):Promise.resolve(null),
@@ -167,6 +177,7 @@ export async function pullMarketing(domain:string,brandName:string):Promise<Mark
  ]);
  if(b)reports.push({source:"brandsearch",ok:"metrics" in b&&!!b.metrics,note:b.note});
  if(a)reports.push({source:"atria",ok:"landing" in a&&!!a.landing,note:a.note});
+ const errs=[...new Set(errors)];if(errs.length)reports.push({source:errs.some(e=>e.includes("tryatria"))?"atria":"brandsearch",ok:false,note:"API errors: "+errs.slice(0,3).join(" | ")});
  const marketing:Marketing|undefined=b&&"marketing" in b&&b.marketing?{...b.marketing,...(a&&"landing" in a?{landing:a.landing}:{})}:a&&"landing" in a?{asOf:a.landing!.asOf,source:"Atria",landing:a.landing}:undefined;
  return {metrics:b&&"metrics" in b?b.metrics:undefined,marketing,reports,...({topCopy:b?.topCopy||[]} as any)};
 }
