@@ -303,7 +303,7 @@ button.indexCard{cursor:pointer}button.indexCard:hover{border-color:#b23a26}
 .clippings .adCard::before{content:"";position:absolute;top:-7px;left:50%;width:56px;height:14px;margin-left:-28px;background:rgba(217,203,178,.85);transform:rotate(-2deg)}
 .clippings .adCard p{font-family:var(--f-display);font-size:15px;line-height:1.45;color:#2f2922}
 .clippings .adCard b{color:var(--ink)}.clippings .adCard .dim,.clippings .adCard .small{color:#6b604f!important}
-@media (max-width:760px){.viewSwitch button{padding:6px 8px;font-size:12px}.viewSwitch button:last-child{display:none}.portfolio{padding:20px 16px 40px}.pfHead h1{font-size:28px}.nwList{grid-template-columns:minmax(0,1fr)}.money li+li::before{display:none}}
+@media (max-width:760px){.viewSwitch button{padding:6px 8px;font-size:12px}.portfolio{padding:20px 16px 40px}.pfHead h1{font-size:28px}.nwList{grid-template-columns:minmax(0,1fr)}.money li+li::before{display:none}}
 .logoBtn{border:0;background:transparent;font:inherit;cursor:pointer;text-decoration:none;text-align:left}.logoBtn:hover .wordmark{color:#fff7ee}.logoBtn:focus-visible{outline:2px solid var(--rust);outline-offset:4px;border-radius:6px}
 /* admin + auth extras */
 .forgotLink{align-self:flex-end;font-size:12px;color:#e0a07a;margin-top:2px}
@@ -443,3 +443,21 @@ button.chItem{cursor:pointer}button.chItem:hover{background:#221d17}
 .chRow:hover .chEv,.chRow:focus .chEv{display:block}
 .chKey{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 3px 0 6px;vertical-align:middle}
 .chKey.st-live{background:#e0563f}.chKey.st-tag{background:#e0a93f}.chKey.st-mention{border:1.5px solid #8f846f}
+
+/* open case tabs: several case files open at once */
+.caseTabs{position:sticky;top:68px;z-index:3;display:flex;align-items:flex-end;gap:4px;padding:8px 30px 0;background:#16130f;border-bottom:1px solid #3a3228;overflow-x:auto;scrollbar-width:none}
+.caseTabs::-webkit-scrollbar{display:none}
+.caseTab{display:flex;align-items:center;flex:none;max-width:230px;background:#221d17;border:1px solid #3a3228;border-bottom:0;border-radius:6px 6px 0 0;color:#a99e8c;margin-bottom:-1px}
+.caseTab:hover{color:#efe6d6}
+.caseTab.on{background:#efe6d6;border-color:#efe6d6;color:#1d1a16}
+.ctOpen{display:flex;align-items:center;gap:7px;min-width:0;border:0;background:transparent;color:inherit;font:inherit;font-size:12.5px;padding:7px 4px 7px 11px;cursor:pointer}
+.caseTab.on .ctOpen{font-weight:600}
+.ctName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctNo{font-family:var(--f-mono);font-size:10px;opacity:.65;white-space:nowrap}
+.ctClose{display:grid;place-items:center;border:0;background:transparent;color:inherit;opacity:.55;padding:4px;margin-right:5px;border-radius:4px;cursor:pointer}
+.ctClose:hover,.ctClose:focus-visible{opacity:1;background:#0000001f}
+.ctAdd,.ctAll{flex:none;border:0;background:transparent;color:#a99e8c;cursor:pointer;font:inherit;font-size:12px;padding:7px 8px;align-self:center}
+.ctAdd{display:grid;place-items:center;border-radius:6px}
+.ctAdd:hover,.ctAll:hover{color:#efe6d6;background:#221d17}
+.ctAll{margin-left:auto;border-radius:6px;white-space:nowrap}
+@media(max-width:900px){.caseTabs{top:60px;padding:6px 16px 0}.caseTab{max-width:170px}.ctNo{display:none}}

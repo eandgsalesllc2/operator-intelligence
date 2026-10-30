@@ -12,7 +12,7 @@ type Match={investigation_id:string;name:string;kind:string;value:string};
 type Finding={tag:string;tone:"ok"|"strong"|"warn"|"lead"|"bad";source:string;title:string;detail?:string;open?:string};
 
 const STAMP:Record<string,{text:string;tone:string}>={identified:{text:"OWNER\nIDENTIFIED",tone:"ok"},legal_entity_only:{text:"LEGAL ENTITY\nONLY",tone:"warn"},operator_unknown:{text:"OPERATOR\nUNKNOWN",tone:"bad"},contested:{text:"OWNERSHIP\nCONTESTED",tone:"bad"}};
-const caseNo=(id:string)=>{let h=7;for(const ch of id)h=(h*33+ch.charCodeAt(0))>>>0;return String(h%10000).padStart(4,"0")};
+export const caseNo=(id:string)=>{let h=7;for(const ch of id)h=(h*33+ch.charCodeAt(0))>>>0;return String(h%10000).padStart(4,"0")};
 
 function findings(c:Case,matches:Match[]):Finding[]{
  const out:Finding[]=[];const p=c.profile,m=c.marketing;

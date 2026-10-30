@@ -6,7 +6,7 @@ import {addEvidence,createInvestigation,loadCases,pivotNode,saveCases} from "@/l
 import {CATEGORIES,UNCATEGORIZED,labelOf,verticalOf} from "@/lib/categories";
 import {MRR_METHOD,REVENUE_METHOD,compact,currencySymbol} from "@/lib/metrics";
 import ProfilePanel from "./ProfilePanel";
-import CaseHero from "./CaseHero";
+import CaseHero,{caseNo} from "./CaseHero";
 import Portfolio from "./Portfolio";
 import Networks from "./Networks";
 import CommandPalette from "./CommandPalette";
@@ -24,6 +24,7 @@ const tilt=(id:string)=>{let h=0;for(const ch of id)h=(h*31+ch.charCodeAt(0))|0;
 const icons:Record<NodeType,any>={brand:Globe2,person:UserRound,company:Building2,trademark:Tags,domain:Globe2,address:MapPin,phone:Phone,email:Mail};
 const TYPES:{value:NodeType;label:string}[]=[{value:"brand",label:"Brand"},{value:"domain",label:"Domain / website"},{value:"person",label:"Person"},{value:"company",label:"Company / LLC"},{value:"trademark",label:"Trademark"},{value:"email",label:"Email"},{value:"phone",label:"Phone"},{value:"address",label:"Address"}];
 type Job={id:string;investigation_id:string;status:"queued"|"running"|"completed"|"failed";progress:number;message:string;seed_value:string};
+const OPEN_KEY="bt:openCases",MAX_OPEN=12; // open case tabs, kept per browser
 
 function guessType(v:string):NodeType{
  const s=v.trim();
@@ -58,6 +59,11 @@ export default function Dashboard(){
  const polls=useRef<Record<string,number>>({});
  const [me,setMe]=useState<Me|null>(null),[tour,setTour]=useState(false),[view,setView]=useState<"portfolio"|"networks"|"watchlist"|"case">("portfolio"),[cmd,setCmd]=useState<string|null>(null),[demo,setDemo]=useState(false);
  useEffect(()=>{const k=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setCmd(c=>c===null?"":null)}};window.addEventListener("keydown",k);return()=>window.removeEventListener("keydown",k)},[]);
+ // ⌥W closes the current case tab, ⌥[ / ⌥] move between open cases (not while typing in a field).
+ const tabKeys=useRef<{close:()=>void;cycle:(d:number)=>void}>({close:()=>{},cycle:()=>{}});
+ useEffect(()=>{const k=(e:KeyboardEvent)=>{if(!e.altKey||e.metaKey||e.ctrlKey)return;const t=e.target as HTMLElement|null;if(t?.closest?.("input,textarea,select,[contenteditable]"))return;
+  if(e.code==="KeyW"){e.preventDefault();tabKeys.current.close()}else if(e.code==="BracketLeft"||e.code==="BracketRight"){e.preventDefault();tabKeys.current.cycle(e.code==="BracketRight"?1:-1)}};
+  window.addEventListener("keydown",k);return()=>window.removeEventListener("keydown",k)},[]);
  // ---- URL <-> view: "/" case files, "/networks", "/case/<id>?tab=…" (shareable, Back/Forward work) ----
  const TABS=["graph","evidence","timeline","profile","marketing"];
  const [watch,setWatch]=useState<WatchData|null>(null);
@@ -104,6 +110,22 @@ export default function Dashboard(){
   return ()=>Object.values(timers).forEach(t=>clearTimeout(t));
  },[]);
  useEffect(()=>{if(!db&&allCases.length){try{saveCases(allCases)}catch{}}},[allCases,db]);
+
+ // ---- Open case tabs: several case files open at once, each remembering its sub-tab and scroll position ----
+ const [openIds,setOpenIds]=useState<string[]>([]);
+ const caseTabs=useRef<Record<string,string>>({}),caseScroll=useRef<Record<string,number>>({}),tabsRestored=useRef(false);
+ useEffect(()=>{ // restore this browser's open tabs once the real case files are in
+  if(loading||tabsRestored.current)return;tabsRestored.current=true;
+  let saved:string[]=[];try{saved=JSON.parse(localStorage.getItem(OPEN_KEY)||"[]")}catch{}
+  if(Array.isArray(saved))setOpenIds(p=>[...saved.filter(id=>typeof id==="string"&&!p.includes(id)),...p]);
+ },[loading]);
+ useEffect(()=>{if(loading)return;setOpenIds(p=>{const n=p.filter(id=>allCases.some(x=>x.id===id));return n.length===p.length?p:n})},[allCases,loading]); // drop deleted cases
+ useEffect(()=>{ // whatever case is on screen is always one of the open tabs
+  if(view!=="case"||loading||!allCases.some(x=>x.id===caseId))return;
+  caseTabs.current[caseId]=tab;
+  setOpenIds(p=>p.includes(caseId)?p:[...p,caseId].slice(-MAX_OPEN));
+ },[view,caseId,tab,loading,allCases]);
+ useEffect(()=>{if(tabsRestored.current){try{localStorage.setItem(OPEN_KEY,JSON.stringify(openIds))}catch{}}},[openIds]);
 
  const c=allCases.find(x=>x.id===caseId)||allCases[0];
  const catCounts=useMemo(()=>{const m=new Map<string,number>();for(const x of allCases){const k=x.category||UNCATEGORIZED;m.set(k,(m.get(k)||0)+1)}return m},[allCases]);
@@ -156,7 +178,21 @@ export default function Dashboard(){
  const sync=(next:Case)=>fetch("/api/investigations",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(next)}).catch(()=>{});
  const updateCase=(next:Case)=>{setAllCases(prev=>prev.map(x=>x.id===next.id?next:x));sync(next)};
  const deleteCase=async(id:string,name:string)=>{if(!window.confirm(`Delete ${name}? This permanently removes the investigation and all collected research.`))return;const r=await fetch("/api/investigations",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});const d=await r.json();if(!r.ok){setNotice(d.error||"Delete failed");return}setAllCases(prev=>{const next=prev.filter(x=>x.id!==id);if(id===caseId&&next[0])setCaseId(next[0].id);return next});setPick(null)};
- const openCase=(id:string)=>{setCaseId(id);setPick(null);setView("case");setNavOpen(false);if(typeof window!=="undefined")document.querySelector(".shell")?.scrollTo({top:0})};
+ // Opening a case that's already open switches to its tab and picks up where you left it.
+ const openCase=(id:string)=>{
+  if(view==="case")caseScroll.current[caseId]=window.scrollY;
+  const y=id===caseId&&view==="case"?window.scrollY:caseScroll.current[id]||0;
+  setCaseId(id);setTab(caseTabs.current[id]||"graph");setPick(null);setView("case");setNavOpen(false);
+  requestAnimationFrame(()=>window.scrollTo({top:y}));
+ };
+ const closeCase=(id:string)=>{
+  const i=openIds.indexOf(id),rest=openIds.filter(x=>x!==id);
+  setOpenIds(rest);delete caseScroll.current[id];
+  if(view==="case"&&id===caseId){const next=rest[i]||rest[i-1];if(next)openCase(next);else{setView("portfolio");setPick(null)}}
+ };
+ const closeAll=()=>{setOpenIds([]);caseScroll.current={};if(view==="case"){setView("portfolio");setPick(null)}};
+ const cycleCase=(d:number)=>{if(!openIds.length)return;const i=openIds.indexOf(caseId);openCase(openIds[view==="case"&&i>=0?(i+d+openIds.length)%openIds.length:d>0?0:openIds.length-1])};
+ tabKeys.current={close:()=>{if(view==="case"&&!loading)closeCase(caseId)},cycle:d=>{if(!loading)cycleCase(d)}};
  const submitNew=async(e:React.FormEvent)=>{
   e.preventDefault();const value=newSeed.value.trim();if(!value)return;
   const seedType=(newSeed.type==="auto"?guessType(value):newSeed.type) as NodeType;
@@ -181,7 +217,10 @@ export default function Dashboard(){
   {vOpen&&g.cats.map(ct=>{const cOpen=Boolean(sq.trim())||cat===ct.k||openGroups.has("c:"+ct.k);return <div key={ct.k} className="sub"><button className="subHead" aria-expanded={cOpen} onClick={()=>toggleGroup("c:"+ct.k)}>{cOpen?<ChevronDown size={12}/>:<ChevronRight size={12}/>}<span>{labelOf(ct.k)}</span><em>{ct.items.length}</em></button>{cOpen&&ct.items.map(renderCase)}</div>})}</div>})}{!sideCases.length&&<p className="sideEmpty">{loading?"Loading investigations…":`No investigations match "${sq}".`}</p>}</div>
  <div className="sideLabel bottom">SYSTEM</div><div className="mini"><ShieldCheck size={15}/> Evidence standard: strict</div><div className="mini"><Sparkles size={15}/> Web research: {webResearch===null?"checking…":webResearch?"on":"off"}</div>
  {me&&<AccountMenu me={me} onReplay={()=>{setNavOpen(false);setTour(true)}}/>}
- </aside>{demo&&<Demo onClose={()=>setDemo(false)} onAction={(a:DemoAction)=>{if(a.type==="case"){const x=allCases.find(y=>y.id===a.id);if(!x){setNotice("That example brand isn't in your case files.");return}openCase(a.id);setTab(a.tab||"graph")}else if(a.type==="networks")setView("networks");else if(a.type==="watchlist")setView("watchlist");else if(a.type==="cmd")setCmd(a.q)}}/>}{cmd!==null&&<CommandPalette initial={cmd} onClose={()=>setCmd(null)} onOpenCase={openCase} onResearch={v=>openNew(v)} local={t=>{const l=t.toLowerCase();const out:{group:"brand"|"entity";label:string;detail:string;caseId:string;caseName:string}[]=[];for(const x of allCases){if((x.name+" "+x.domain).toLowerCase().includes(l))out.push({group:"brand",label:x.name,detail:[x.domain,x.category].filter(Boolean).join(" · "),caseId:x.id,caseName:x.name});else{const n=x.nodes.find(n=>n.id!==x.id+":seed"&&n.label.toLowerCase().includes(l));if(n)out.push({group:"entity",label:n.label,detail:n.type,caseId:x.id,caseName:x.name})}if(out.length>40)break}return out}}/>}{tour&&<Onboarding name={me?.full_name} onDone={()=>{setTour(false);setMe(m=>m?{...m,onboarded_at:new Date().toISOString()}:m)}}/>}<section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><nav className="viewSwitch" aria-label="View"><button aria-pressed={view==="portfolio"} className={view==="portfolio"?"on":""} onClick={()=>setView("portfolio")}>Case files</button><button aria-pressed={view==="networks"} className={view==="networks"?"on":""} onClick={()=>setView("networks")}>Networks</button><button aria-pressed={view==="watchlist"} className={view==="watchlist"?"on":""} onClick={()=>setView("watchlist")}>Watchlist{watch&&watch.unread>0?<span className="badgeDot" aria-label={`${watch.unread} unread changes`}>{watch.unread>99?"99+":watch.unread}</span>:null}</button><button aria-pressed={view==="case"} className={view==="case"?"on":""} onClick={()=>setView("case")} title={loading?"Loading":c.name}>{loading?"Case":c.name.length>16?c.name.slice(0,15)+"…":c.name}</button></nav><button className="demoBtn" onClick={()=>setDemo(true)} aria-label="Demo: see what you can do with BrandTracer"><Play size={14}/><span>Demo</span></button><button className="search searchBtn" onClick={()=>setCmd("")} aria-label="Search everything (⌘K)"><Search size={17}/><span>Search brands, people, pixel IDs, phones…</span><kbd>⌘K</kbd></button><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
+ </aside>{demo&&<Demo onClose={()=>setDemo(false)} onAction={(a:DemoAction)=>{if(a.type==="case"){const x=allCases.find(y=>y.id===a.id);if(!x){setNotice("That example brand isn't in your case files.");return}openCase(a.id);setTab(a.tab||"graph")}else if(a.type==="networks")setView("networks");else if(a.type==="watchlist")setView("watchlist");else if(a.type==="cmd")setCmd(a.q)}}/>}{cmd!==null&&<CommandPalette initial={cmd} onClose={()=>setCmd(null)} onOpenCase={openCase} onResearch={v=>openNew(v)} local={t=>{const l=t.toLowerCase();const out:{group:"brand"|"entity";label:string;detail:string;caseId:string;caseName:string}[]=[];for(const x of allCases){if((x.name+" "+x.domain).toLowerCase().includes(l))out.push({group:"brand",label:x.name,detail:[x.domain,x.category].filter(Boolean).join(" · "),caseId:x.id,caseName:x.name});else{const n=x.nodes.find(n=>n.id!==x.id+":seed"&&n.label.toLowerCase().includes(l));if(n)out.push({group:"entity",label:n.label,detail:n.type,caseId:x.id,caseName:x.name})}if(out.length>40)break}return out}}/>}{tour&&<Onboarding name={me?.full_name} onDone={()=>{setTour(false);setMe(m=>m?{...m,onboarded_at:new Date().toISOString()}:m)}}/>}<section className="shell"><header><button className="menuBtn" onClick={()=>setNavOpen(true)} aria-label="Open investigations"><Menu size={18}/></button><nav className="viewSwitch" aria-label="View"><button aria-pressed={view==="portfolio"} className={view==="portfolio"?"on":""} onClick={()=>setView("portfolio")}>Case files</button><button aria-pressed={view==="networks"} className={view==="networks"?"on":""} onClick={()=>setView("networks")}>Networks</button><button aria-pressed={view==="watchlist"} className={view==="watchlist"?"on":""} onClick={()=>setView("watchlist")}>Watchlist{watch&&watch.unread>0?<span className="badgeDot" aria-label={`${watch.unread} unread changes`}>{watch.unread>99?"99+":watch.unread}</span>:null}</button></nav><button className="demoBtn" onClick={()=>setDemo(true)} aria-label="Demo: see what you can do with BrandTracer"><Play size={14}/><span>Demo</span></button><button className="search searchBtn" onClick={()=>setCmd("")} aria-label="Search everything (⌘K)"><Search size={17}/><span>Search brands, people, pixel IDs, phones…</span><kbd>⌘K</kbd></button><div className="legend"><Badge c="confirmed"/><Badge c="strong"/><Badge c="correlation"/></div></header>
+ {!loading&&openIds.length>0&&<div className="caseTabs" role="tablist" aria-label="Open case files">{openIds.map(id=>{const x=allCases.find(y=>y.id===id);if(!x)return null;const on=view==="case"&&id===caseId;const j=jobs[id];const running=j&&(j.status==="queued"||j.status==="running");
+  return <div key={id} className={"caseTab"+(on?" on":"")} onAuxClick={e=>{if(e.button===1){e.preventDefault();closeCase(id)}}}><button role="tab" aria-selected={on} className="ctOpen" onClick={()=>openCase(id)} title={`${x.name}${x.domain?` · ${x.domain}`:""}`}>{running?<Loader2 size={12} className="spin"/>:<span className="ctNo">№ {caseNo(id)}</span>}<span className="ctName">{x.name}</span></button><button className="ctClose" onClick={()=>closeCase(id)} aria-label={`Close ${x.name}`} title="Close (⌥W)"><X size={12}/></button></div>})}
+  <button className="ctAdd" onClick={()=>setCmd("")} aria-label="Open another case file" title="Open another case (⌘K)"><Plus size={14}/></button>{openIds.length>1&&<button className="ctAll" onClick={closeAll}>Close all</button>}</div>}
 
  {loading&&view!=="networks"&&<div className="portfolio"><p className="pfEmpty"><Loader2 size={16} className="spin"/> Loading your case files…</p></div>}
  {view==="portfolio"&&!loading&&<Portfolio cases={sideCases} total={allCases.length} flag={flag} setFlag={setFlag} onOpen={openCase} watched={watched} onToggleWatch={toggleWatch}/>}
