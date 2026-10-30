@@ -461,3 +461,12 @@ button.chItem{cursor:pointer}button.chItem:hover{background:#221d17}
 .ctAdd:hover,.ctAll:hover{color:#efe6d6;background:#221d17}
 .ctAll{margin-left:auto;border-radius:6px;white-space:nowrap}
 @media(max-width:900px){.caseTabs{top:60px;padding:6px 16px 0}.caseTab{max-width:170px}.ctNo{display:none}}
+
+/* recent searches in the ⌘K palette */
+.cmdRecentHead{display:flex;justify-content:space-between;align-items:center}
+.cmdRecentHead button{border:0;background:transparent;color:#a99e8c;font:inherit;font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;cursor:pointer;padding:2px 4px;border-radius:4px}
+.cmdRecentHead button:hover{color:#efe6d6}
+.cmdRecent{position:relative}
+.cmdRecent .cmdRow{padding-right:38px}
+.cmdForget{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:grid;place-items:center;border:0;background:transparent;color:#a99e8c;opacity:.6;padding:5px;border-radius:5px;cursor:pointer}
+.cmdForget:hover,.cmdForget:focus-visible{opacity:1;color:#efe6d6;background:#3a3228}
