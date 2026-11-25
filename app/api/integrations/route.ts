@@ -14,7 +14,7 @@ export async function GET(req:NextRequest){
  const atriaRaw=async(path:string,init?:RequestInit)=>{const r=await fetch("https://api.tryatria.com/open/v1"+path,{...init,headers:{"X-API-Key":process.env.ATRIA_API_KEY||"",Accept:"application/json","Content-Type":"application/json"},cache:"no-store"});
   const text=await r.text();let body:any=null;try{body=JSON.parse(text)}catch{};return {status:r.status,code:body?.code,message:body?.message||body?.error||(body?null:text.slice(0,300)),data:body?.data}};
  if(req.nextUrl.searchParams.get("probe")==="atria-ads"){
-  const id=req.nextUrl.searchParams.get("id")||"";const u=new URLSearchParams();u.append(/^[0-9a-f-]{36}$/i.test(id)?"unified_brand_id":"brand_id",id);u.append("status",req.nextUrl.searchParams.get("status")||"active");u.set("order","most_impressions");u.set("page_size","5");
+  const id=req.nextUrl.searchParams.get("id")||"";const u=new URLSearchParams();const hex=id.replace(/-/g,"");if(/^[0-9a-f]{32}$/i.test(hex))u.append("unified_brand_id",`${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`);else u.append("brand_id",id);u.append("status",req.nextUrl.searchParams.get("status")||"active");u.set("order","most_impressions");u.set("page_size","5");
   const r=await atriaRaw("/ad-library/search?"+u);const items=r.data?.items||[];
   return Response.json({status:r.status,code:r.code,message:r.message,total:r.data?.total,cursor:!!r.data?.cursor,count:items.length,
    sample:items.slice(0,3).map((a:any)=>({brand_id:a.brand_id,brand_name:a.brand_name,status:a.status,link_url:a.link_url,days_running:a.days_running,impression_rank:a.impression_rank}))});

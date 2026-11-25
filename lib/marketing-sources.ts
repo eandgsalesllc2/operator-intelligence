@@ -110,8 +110,10 @@ function unwrap(u:string){try{const x=new URL(u);if(/(^|\.)facebook\.com$/.test(
 
 // Atria's API (v0.2.0, Oct 2026): brands come from POST /inspo-brands/search, which matches on the brand's own
 // hosts, and their ads from GET /ad-library/search scoped to that brand (every advertiser that runs its ads).
-const isUuid=(s:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-const adScope=(id:string)=>isUuid(id)?{unified_brand_id:[id]}:{brand_id:[id]};
+// Unified brand ids come back as 32 hex chars but the ad search only accepts them dashed (UUID form);
+// advertiser ids ("m123…", "t123…") go in brand_id.
+const asUuid=(s:string)=>{const h=s.replace(/-/g,"");return /^[0-9a-f]{32}$/i.test(h)?`${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`:null};
+const adScope=(id:string)=>{const u=asUuid(id);return u?{unified_brand_id:[u]}:{brand_id:[id]}};
 async function atriaAds(scope:Q,status:"active"|"inactive",pagesN:number,pageSize=50){
  const out:any[]=[];let cursor:string|undefined;let total=0;
  for(let i=0;i<pagesN;i++){
@@ -135,10 +137,16 @@ async function fromAtria(domain:string,brandName:string){
  const advs:any[]=brand.advertisers||[];
  const mainAdv=advs.find(a=>a.main)||advs.find(a=>a.official)||advs[0];
  // Ads for the whole brand; if the brand scope comes back empty, fall back to its main advertiser.
+ // The brand scope also returns every ad of any page that ever linked here (affiliate pages that promote many
+ // brands), so keep official-advertiser ads (they may go to off-site listicles) and other pages' ads that land here.
+ const official=new Set(advs.filter(a=>a.official||a.main).map(a=>String(a.id)));
+ const mine=(a:any)=>official.has(String(a.brand_id))||(()=>{try{return onRoot(new URL(unwrap(a.link_url||"")).hostname)}catch{return false}})();
  let scope:Q=adScope(brand.id);
  let {ads:mainAds,total}=await atriaAds(scope,"active",2);let status:"active"|"inactive"="active";
+ mainAds=mainAds.filter(mine);
  if(!mainAds.length&&mainAdv?.id){scope=adScope(String(mainAdv.id));({ads:mainAds,total}=await atriaAds(scope,"active",2))}
- if(!mainAds.length){status="inactive";mainAds=(await atriaAds(scope,"inactive",1)).ads}
+ if(!mainAds.length){status="inactive";mainAds=(await atriaAds(scope,"inactive",1)).ads.filter(mine)}
+ if(status==="active")total=brand.ads?.active||total; // the brand scope's total counts the affiliate pages' unrelated ads
  const otherAds:any[]=[];
  const main={id:String(mainAdv?.id||brand.id),name:mainAdv?.name||brand.name||root,ad_num:mainAdv?.total_ads??brand.ads?.total};
  const verified=[main,...advs.filter(a=>a!==mainAdv&&(a.official||(a.total_ads||0)>=20)).slice(0,6).map(a=>({id:String(a.id),name:a.name||"?",ad_num:a.total_ads}))];
@@ -160,7 +168,7 @@ async function fromAtria(domain:string,brandName:string){
  const landing:NonNullable<Marketing["landing"]>={asOf:new Date().toISOString().slice(0,10),source:"Atria ad library (landing URLs)",brandId:String(brand.id),
   advertisers:verified.map((b,i)=>({id:b.id,name:b.name,totalAds:b.ad_num,role:i===0?"main":"linking_page"})),
   landingPages,hosts:[...hosts.entries()].sort((a,b)=>b[1]-a[1]).map(([host,activeAds])=>({host,activeAds})),kindMix,
-  sampledActiveAds:mainAds.length+otherAds.length,totalActiveAds:status==="active"?(total||brand.ads?.active||0):0,
+  sampledActiveAds:mainAds.length+otherAds.length,totalActiveAds:status==="active"?total:0,
   notes:landingPages.length?`${status==="inactive"?"No active ads; showing the most recently ended. ":""}Most ads go to ${top.slice(0,2).map(([k,v])=>`${PAGE_KIND_LABEL[k]||k} pages (${v})`).join(" and ")} across ${hosts.size} host${hosts.size>1?"s":""}.`:"The matched advertiser has no ads with landing URLs."};
  return {landing,note:`${landingPages.length} landing pages from ${main.name}`};
 }
