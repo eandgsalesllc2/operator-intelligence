@@ -34,7 +34,7 @@ export type Marketing={
  // Running landing pages from Atria's ad library (landing URLs) plus BrandSearch funnel types.
  landing?:{asOf?:string;source?:string;notes?:string;totalActiveAds?:number;sampledActiveAds?:number;
   advertisers?:{id:string;name:string;totalAds?:number;role?:string}[];
-  landingPages?:{url:string;host?:string;path?:string;kind?:string;activeAds?:number;bestRank?:number|null;maxDaysRunning?:number|null;pages?:string[];headline?:string|null;status?:string}[];
+  landingPages?:{url:string;host?:string;path?:string;kind?:string;activeAds?:number;bestRank?:number|null;maxDaysRunning?:number|null;pages?:string[];headline?:string|null;status?:string;finalUrl?:string;title?:string|null;offsite?:boolean;checkedBy?:string}[];
   hosts?:{host:string;activeAds:number}[];kindMix?:Record<string,number>;brandsearchFunnelMix?:Record<string,number>|null}|null;
  // Pixels and vendor tags found on the storefront (see lib/channels.ts).
  channelScan?:import("./channel-signatures").ChannelScan|null;
@@ -102,5 +102,8 @@ export function tagsFor(p?:Profile|null,m?:Marketing|null,network?:string|null):
  if(/jsdeliver/.test(risks))t.add("lookalike-script");
  if(m?.strategy?.scale)t.add("scale:"+m.strategy.scale);
  if(m?.strategy?.complianceFlags?.length)t.add("compliance-flags");
+ // Where ads send traffic: a page type counts once at least 2 live ads point at it.
+ const mix:Record<string,number>={};for(const l of m?.landing?.landingPages||[])if(l.status!=="inactive")mix[l.kind||""]=(mix[l.kind||""]||0)+(l.activeAds||0);
+ for(const k of ["product","listicle","advertorial","quiz"])if((mix[k]||0)>=2)t.add("traffic:"+k);
  return [...t];
 }

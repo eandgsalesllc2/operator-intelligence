@@ -1,6 +1,7 @@
 // Traffic, revenue forecast and marketing data for a brand from BrandSearch (traffic, products, Meta/TikTok/
 // Instagram/email activity) and Atria (live landing pages). Server-only: keys come from BRANDSEARCH_API_KEY
 // and ATRIA_API_KEY. Everything is best-effort — a missing brand or a failed call leaves that part empty.
+import {classifyPages,urlKind,PAGE_KIND_LABEL} from "./page-type";
 import {forecast,type Metrics} from "./metrics";
 import type {Marketing} from "./profile";
 
@@ -100,20 +101,8 @@ async function fromBrandsearch(domain:string):Promise<{metrics?:Metrics;marketin
 }
 
 // ---------------- Atria: running landing pages ----------------
-const MARKET=/(^|\.)(amazon\.|amzn\.|walmart\.|target\.com|costco\.|samsclub\.|sephora\.|ulta\.|cvs\.|walgreens\.|tiktok\.com)/;
+// Page types (PDP, listicle, advertorial, quiz…) come from lib/page-type.ts.
 function unwrap(u:string){try{const x=new URL(u);if(/(^|\.)facebook\.com$/.test(x.hostname)&&x.pathname==="/l.php"){const inner=x.searchParams.get("u");if(inner)return inner}return u}catch{return u}}
-function classify(host:string,path:string,own:boolean,headline:string){
- const p=path.toLowerCase();
- if(MARKET.test(host))return "marketplace";
- if(/quiz|survey|assessment/.test(host+p))return "quiz";
- if(/checkout|\/cart/.test(p))return "checkout";
- if(/advertorial|article|story|blog|news|review|listicle|reasons|discover|doctor|\/why/.test(p)||/reasons|why .* (love|switch)/i.test(headline))return "advertorial";
- if(!own)return "external";
- if(p.startsWith("/products/"))return "product";
- if(p.startsWith("/collections/"))return "collection";
- if(p===""||p==="/")return "home";
- return "offer_lp";
-}
 
 async function fromAtria(domain:string,brandName:string){
  const root=rootDomain(domain);const stem=nameStem(domain);
@@ -153,11 +142,13 @@ async function fromAtria(domain:string,brandName:string){
   if(!a.link_url)continue;
   let url:URL;try{url=new URL(unwrap(a.link_url))}catch{continue}
   const host=bare(url.hostname);const path=url.pathname.replace(/\/+$/,"")||"/";const key=host+path;
-  const g=groups.get(key)||{url:`https://${host}${path==="/"?"":path}`,host,path,kind:classify(host,path,host.endsWith(root),String(a.title||"")),activeAds:0,bestRank:null as number|null,maxDaysRunning:0,pages:new Set<string>(),headline:a.title||null,status};
+  const g=groups.get(key)||{url:`https://${host}${path==="/"?"":path}`,host,path,kind:urlKind(host,path,host.endsWith(root),String(a.title||"")),activeAds:0,bestRank:null as number|null,maxDaysRunning:0,pages:new Set<string>(),headline:a.title||null,status};
   g.activeAds++;const rk=num(a.impression_rank?.peak_rank?.rank)??num(a.impression_rank?.latest_rank?.rank)??num(a.impression_rank?.best?.rank);if(rk!=null&&(g.bestRank==null||rk<g.bestRank))g.bestRank=rk;
   g.maxDaysRunning=Math.max(g.maxDaysRunning,num(a.days_running)??0);if(a.brand_name)g.pages.add(String(a.brand_name));groups.set(key,g);
  }
- const landingPages=[...groups.values()].sort((a,b)=>b.activeAds-a.activeAds||(a.bestRank??1e9)-(b.bestRank??1e9)).slice(0,25).map(g=>({...g,pages:[...g.pages]}));
+ const ranked2=[...groups.values()].sort((a,b)=>b.activeAds-a.activeAds||(a.bestRank??1e9)-(b.bestRank??1e9));
+ await classifyPages(ranked2,root); // open the top pages: the URL alone can't tell a listicle from a sales page
+ const landingPages=ranked2.slice(0,25).map(g=>({...g,pages:[...g.pages]}));
  const hosts=new Map<string,number>();const kindMix:Record<string,number>={};
  for(const g of groups.values()){hosts.set(g.host,(hosts.get(g.host)||0)+g.activeAds);kindMix[g.kind]=(kindMix[g.kind]||0)+g.activeAds}
  const top=Object.entries(kindMix).sort((a,b)=>b[1]-a[1]);
@@ -165,7 +156,7 @@ async function fromAtria(domain:string,brandName:string){
   advertisers:[main,...verified.filter(b=>b!==main)].map((b,i)=>({id:b.id,name:b.name,totalAds:b.ad_num,role:i===0?"main":"linking_page"})),
   landingPages,hosts:[...hosts.entries()].sort((a,b)=>b[1]-a[1]).map(([host,activeAds])=>({host,activeAds})),kindMix,
   sampledActiveAds:mainAds.length+otherAds.length,totalActiveAds:status==="active"?total:0,
-  notes:landingPages.length?`${status==="inactive"?"No active ads; showing the most recently ended. ":""}Most ads go to ${top.slice(0,2).map(([k,v])=>`${k.replace("_"," ")} pages (${v})`).join(" and ")} across ${hosts.size} host${hosts.size>1?"s":""}.`:"The matched advertiser has no ads with landing URLs."};
+  notes:landingPages.length?`${status==="inactive"?"No active ads; showing the most recently ended. ":""}Most ads go to ${top.slice(0,2).map(([k,v])=>`${PAGE_KIND_LABEL[k]||k} pages (${v})`).join(" and ")} across ${hosts.size} host${hosts.size>1?"s":""}.`:"The matched advertiser has no ads with landing URLs."};
  return {landing,note:`${landingPages.length} landing pages from ${main.name}`};
 }
 

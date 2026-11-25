@@ -3,10 +3,39 @@ import {Case} from "@/lib/types";
 import {compact} from "@/lib/metrics";
 import AdWall from "./AdWall";
 import {channelRows,GROUP_ORDER} from "@/lib/channel-view";
+import {PAGE_KIND_LABEL} from "@/lib/page-kinds";
 import {Megaphone,Target,Mail,PlayCircle,Users,Flag,Route,Link2,Radio} from "lucide-react";
 
-const KIND_TONE:Record<string,string>={advertorial:"warn",quiz:"warn",offer_lp:"",product:"dim",collection:"dim",home:"dim",marketplace:"",external:"bad",checkout:"dim"};
-const KIND_LABEL:Record<string,string>={advertorial:"advertorial / presell",offer_lp:"offer page",product:"product page",collection:"collection",home:"homepage",quiz:"quiz",checkout:"checkout",marketplace:"marketplace",external:"off-site"};
+const KIND_TONE:Record<string,string>={advertorial:"warn",listicle:"warn",quiz:"warn",offer_lp:"",product:"dim",collection:"dim",home:"dim",marketplace:"",external:"bad",checkout:"dim"};
+const KIND_LABEL=PAGE_KIND_LABEL;
+type LP=NonNullable<NonNullable<NonNullable<Case["marketing"]>["landing"]>["landingPages"]>[number];
+const lpHref=(l:LP)=>l.finalUrl||l.url;
+const lpShow=(l:LP)=>{try{const u=new URL(lpHref(l));return u.hostname.replace(/^www\./,"")+(u.pathname==="/"?"":u.pathname)}catch{return (l.host||"")+(l.path||"")}};
+
+// Where the ads send people, grouped by page type: PDPs, listicles, advertorials, quizzes, sales pages, everything else.
+const TRAFFIC_GROUPS:{key:string;title:string;kinds:string[];note:string}[]=[
+ {key:"product",title:"PDPs",kinds:["product"],note:"Product pages on the store"},
+ {key:"listicle",title:"Listicles",kinds:["listicle"],note:"“5 reasons why…” and ranked comparison pages"},
+ {key:"advertorial",title:"Advertorials",kinds:["advertorial"],note:"Article-style presell pages"},
+ {key:"quiz",title:"Quiz pages",kinds:["quiz"],note:"Quizzes and assessments before the offer"},
+ {key:"offer_lp",title:"Sales / offer pages",kinds:["offer_lp"],note:"Custom landing pages and bundle offers"},
+ {key:"other",title:"Other",kinds:["collection","home","checkout","marketplace","external"],note:"Collections, homepage, checkout, retailers"},
+];
+function TrafficPages({m}:{m:NonNullable<Case["marketing"]>}){
+ const lp=(m.landing?.landingPages||[]).filter(l=>l.status!=="inactive");
+ if(!lp.length)return null;
+ const total=lp.reduce((s,l)=>s+(l.activeAds||0),0)||1;
+ const checked=lp.filter(l=>l.checkedBy==="page").length;
+ return <section className="psec trafficSec"><h4><Route size={14}/> Where the traffic goes <span className="dim small">{lp.length} live pages · {checked?`${checked} opened and classified`:"classified from the URL — refresh to check the pages"}</span></h4>
+  <div className="tgGrid">{TRAFFIC_GROUPS.map(g=>{const ls=lp.filter(l=>g.kinds.includes(l.kind||"")).sort((a,b)=>(b.activeAds||0)-(a.activeAds||0));const ads=ls.reduce((s,l)=>s+(l.activeAds||0),0);
+   return <div key={g.key} className={"tgCard"+(ls.length?"":" empty")}><div className="tgHead"><b>{g.title}</b><span>{ls.length?`${ls.length} page${ls.length>1?"s":""} · ${ads} ads · ${Math.round(ads/total*100)}%`:"none running"}</span></div>
+    {ls.length>0?<ul>{ls.slice(0,6).map((l,i)=><li key={i}><a href={lpHref(l)} target="_blank" rel="noopener noreferrer nofollow" className="mono small">{lpShow(l)}</a>
+     <span className="tgMeta">{l.activeAds??0} ads{l.maxDaysRunning?` · ${l.maxDaysRunning}d`:""}{g.key==="other"?` · ${KIND_LABEL[l.kind||""]||l.kind}`:""}{l.offsite&&l.kind!=="external"?" · off-site":""}</span>
+     {l.finalUrl&&<span className="tgTitle">via {(l.host||"")+(l.path||"")}</span>}
+     {(l.title||l.headline)&&<span className="tgTitle">{l.title||`“${l.headline}”`}</span>}</li>)}{ls.length>6&&<li className="dim small">+{ls.length-6} more in the table below</li>}</ul>:<p className="dim small">{g.note}</p>}
+   </div>})}</div>
+ </section>;
+}
 
 const SCALE_TONE:Record<string,string>={"very high":"bad","high":"warn","medium":"","low":"dim","minimal":"dim"};
 
@@ -25,10 +54,10 @@ function MoneyStrip({m}:{m:NonNullable<Case["marketing"]>}){
  const brandAds=pages.filter(p=>!p.persona).reduce((s,p)=>s+(p.activeAds||0),0),personaAds=pages.filter(p=>p.persona).reduce((s,p)=>s+(p.activeAds||0),0);
  const sum=(ks:string[])=>lp.filter(l=>ks.includes(l.kind||"")).reduce((s,l)=>s+(l.activeAds||0),0);
  const top=(ks:string[])=>lp.filter(l=>ks.includes(l.kind||"")).sort((a,b)=>(b.activeAds||0)-(a.activeAds||0))[0];
- const pre=["advertorial","quiz","offer_lp"],store=["product","collection","home","checkout"],off=["marketplace","external"];
+ const pre=["advertorial","listicle","quiz","offer_lp"],store=["product","collection","home","checkout"],off=["marketplace","external"];
  const steps=[
   {k:"01 · ADS",n:m.meta?.activeAds??null,sub:personaAds?`${compact(personaAds)} via persona pages · ${compact(brandAds)} brand`:m.meta?.activeAds!=null?"from the brand's own pages":"no Meta ads tracked",hot:personaAds>brandAds},
-  {k:"02 · PRESELL",n:sum(pre)||null,sub:top(pre)?`${top(pre)!.kind==="quiz"?"quiz":top(pre)!.kind==="advertorial"?"advertorial":"offer page"} ${top(pre)!.path}`:"straight to the store",hot:sum(pre)>0},
+  {k:"02 · PRESELL",n:sum(pre)||null,sub:top(pre)?`${KIND_LABEL[top(pre)!.kind||""]||"offer page"} ${top(pre)!.path}`:"straight to the store",hot:sum(pre)>0},
   {k:"03 · STORE",n:sum(store)||null,sub:top(store)?`${top(store)!.path}`:"—",hot:false},
   ...(sum(off)?[{k:"04 · OFF-SITE",n:sum(off),sub:`${top(off)!.host}${top(off)!.path}`,hot:true}]:[]),
  ];
@@ -59,6 +88,7 @@ export default function MarketingPanel({c}:{c:Case}){
  return <div className="profile">
   {m.dataWarning&&<div className="notice"><Flag size={15}/><span><b>Check this data:</b> {m.dataWarning}</span></div>}
   <MoneyStrip m={m}/>
+  <TrafficPages m={m}/>
   <Channels c={c}/>
   <AdWall investigationId={c.id}/>
   <div className="pcards">
@@ -90,14 +120,14 @@ export default function MarketingPanel({c}:{c:Case}){
    <section className="pcard"><h4><Mail size={14}/> Email</h4>{m.email&&m.email.total?<><p><b>{m.email.total}</b> emails captured · {m.email.marketing||0} marketing · {m.email.abandonedCart||0} abandoned-cart</p><p className="dim small">{m.email.firstSent?.slice(0,10)} → {m.email.lastSent?.slice(0,10)}</p>{(m.email.recentSubjects||[]).length>0&&<ul className="subjects">{m.email.recentSubjects!.map((x,i)=><li key={i}>{x}</li>)}</ul>}</>:<p className="dim">No emails captured.</p>}</section>
   </div>
 
-  {m.landing&&<section className="psec"><h4><Link2 size={14}/> Running landing pages</h4>
+  {m.landing&&<section className="psec"><h4><Link2 size={14}/> All landing pages</h4>
    {m.landing.notes&&<p className="lead2">{m.landing.notes}</p>}
    <div className="mgrid">
     <div><h5>Ads by page type (Atria)</h5><Bars data={Object.fromEntries(Object.entries(m.landing.kindMix||{}).map(([k,v])=>[KIND_LABEL[k]||k,v]))}/></div>
     <div><h5>Funnel type (BrandSearch)</h5><Bars data={m.landing.brandsearchFunnelMix||undefined}/></div>
     <div><h5>Hosts</h5><Chips items={(m.landing.hosts||[]).slice(0,8).map(h=>`${h.host} · ${h.activeAds}`)}/></div>
    </div>
-   {(m.landing.landingPages||[]).length>0?<div className="tableWrap"><table className="ptable"><thead><tr><th>Landing page</th><th>Type</th><th>Ads</th><th>Best rank</th><th>Days live</th><th>Run by</th></tr></thead><tbody>{m.landing.landingPages!.map((l,i)=><tr key={i}><td className="lpcell"><a href={l.url} target="_blank" rel="noopener noreferrer nofollow" className="mono small">{(l.host||"")+(l.path||"")}</a>{l.headline&&<div className="dim small">“{l.headline}”</div>}</td><td><span className={"chipTag "+(KIND_TONE[l.kind||""]||"")}>{KIND_LABEL[l.kind||""]||l.kind||"—"}</span>{l.status==="inactive"&&<span className="chipTag dim">ended</span>}</td><td>{l.activeAds??"—"}</td><td>{l.bestRank??"—"}</td><td>{l.maxDaysRunning??"—"}</td><td className="small">{(l.pages||[]).slice(0,3).join(", ")}{(l.pages||[]).length>3?` +${l.pages!.length-3}`:""}</td></tr>)}</tbody></table></div>:<p className="dim">No running ads with landing pages found in Atria.</p>}
+   {(m.landing.landingPages||[]).length>0?<div className="tableWrap"><table className="ptable"><thead><tr><th>Landing page</th><th>Type</th><th>Ads</th><th>Best rank</th><th>Days live</th><th>Run by</th></tr></thead><tbody>{m.landing.landingPages!.map((l,i)=><tr key={i}><td className="lpcell"><a href={lpHref(l)} target="_blank" rel="noopener noreferrer nofollow" className="mono small">{lpShow(l)}</a>{l.finalUrl&&<div className="dim small">via {(l.host||"")+(l.path||"")}</div>}{(l.title||l.headline)&&<div className="dim small">{l.title||`“${l.headline}”`}</div>}</td><td><span className={"chipTag "+(KIND_TONE[l.kind||""]||"")}>{KIND_LABEL[l.kind||""]||l.kind||"—"}</span>{l.status==="inactive"&&<span className="chipTag dim">ended</span>}</td><td>{l.activeAds??"—"}</td><td>{l.bestRank??"—"}</td><td>{l.maxDaysRunning??"—"}</td><td className="small">{(l.pages||[]).slice(0,3).join(", ")}{(l.pages||[]).length>3?` +${l.pages!.length-3}`:""}</td></tr>)}</tbody></table></div>:<p className="dim">No running ads with landing pages found in Atria.</p>}
    {(m.landing.advertisers||[]).filter(a=>a.role!=="main").length>0&&<p className="dim small">Other pages whose ads link to this site: {m.landing.advertisers!.filter(a=>a.role!=="main").slice(0,10).map(a=>`${a.name} (${a.totalAds??"?"} ads)`).join(", ")}</p>}
    <p className="dim small">{m.landing.sampledActiveAds!=null?`Sampled ${m.landing.sampledActiveAds} of ${m.landing.totalActiveAds??"?"} active ads by impressions. `:""}Source: Atria ad library{m.landing.brandsearchFunnelMix?" + BrandSearch":""}{m.landing.asOf?` · ${m.landing.asOf}`:""}.</p>
   </section>}

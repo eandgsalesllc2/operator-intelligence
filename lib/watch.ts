@@ -59,15 +59,15 @@ async function linkedCases(c:{id:string;profile?:any;marketing?:any;domain?:stri
 export async function lastSnapshot(id:string):Promise<{taken_at:string;data:Snapshot}|null>{return (await db(`oi_watch_snapshots?investigation_id=eq.${encodeURIComponent(id)}&select=taken_at,data&order=taken_at.desc&limit=1`))?.[0]||null}
 
 // Re-check one brand: fresh BrandSearch/Atria data, compare, record changes, refresh the stored marketing data.
-export async function checkInvestigation(id:string):Promise<{changes:Change[];checked:boolean;note?:string}>{
+export async function checkInvestigation(id:string):Promise<{changes:Change[];checked:boolean;note?:string;sources?:{source:string;ok:boolean;note:string}[];landingPages?:number}>{
  const c=await getInvestigation(id);if(!c)return {changes:[],checked:false,note:"Investigation not found"};
  const prevSnap=await lastSnapshot(id);
  const prev=prevSnap?.data||snapshotOf(c.metrics,c.marketing,await linkedCases(c).catch(()=>[]));
- let metrics=c.metrics,marketing=c.marketing,profile=c.profile;
+ let metrics=c.metrics,marketing=c.marketing,profile=c.profile;let sources:{source:string;ok:boolean;note:string}[]|undefined;
  if(c.domain){
   const plans=await detectSellingPlans(c.domain).catch(()=>null);
   if(plans)profile={...(c.profile||{}),identifiers:{...(c.profile?.identifiers||{}),sellingPlans:plans}};
-  const mp=await pullMarketing(c.domain,/\.[a-z]{2,}$/i.test(c.name)?"":c.name).catch(()=>null);
+  const mp=await pullMarketing(c.domain,/\.[a-z]{2,}$/i.test(c.name)?"":c.name).catch(()=>null);sources=mp?.reports;
   if(mp?.marketing)marketing={...(c.marketing||{}),...mp.marketing,strategy:c.marketing?.strategy??mp.marketing.strategy};
   if(mp?.metrics&&mp.metrics.monthlyVisits!=null)metrics={...mp.metrics,subscription:subscriptionFor(mp.metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans,profile?.identifiers?.subscriptionOverride)};
  }
@@ -77,7 +77,7 @@ export async function checkInvestigation(id:string):Promise<{changes:Change[];ch
  if(changes.length)await db("oi_watch_changes",{method:"POST",body:JSON.stringify(changes.map(x=>({investigation_id:id,...x})))});
  await db("oi_watch_snapshots",{method:"POST",body:JSON.stringify({investigation_id:id,data:next})});
  if(metrics!==c.metrics||marketing!==c.marketing||profile!==c.profile)await refreshMarketing({...c,metrics,marketing,profile});
- return {changes,checked:true};
+ return {changes,checked:true,sources,landingPages:marketing?.landing?.landingPages?.length};
 }
 
 // ---- per-user watchlist ----

@@ -5,6 +5,18 @@ import {labelOf,verticalOf} from "@/lib/categories";
 import {compact,currencySymbol} from "@/lib/metrics";
 import {StarButton} from "./Watchlist";
 import SiteLink from "./SiteLink";
+import {PAGE_KIND_LABEL} from "@/lib/page-kinds";
+
+// Share of live ads per page type, biggest first, for the card's "Traffic →" line.
+const TRAFFIC_ORDER=["product","listicle","advertorial","quiz","offer_lp"];
+function trafficMix(x:Case){
+ // Full cases carry their landing pages; the case list only carries the per-type ad counts (kindMix).
+ const ls=(x.marketing?.landing?.landingPages||[]).filter(l=>l.status!=="inactive");
+ const raw:Record<string,number>={};if(ls.length)for(const l of ls)raw[l.kind||""]=(raw[l.kind||""]||0)+(l.activeAds||0);else Object.assign(raw,x.traffic||{});
+ const tot=Object.values(raw).reduce((s,v)=>s+v,0);if(!tot)return [];
+ const by:Record<string,number>={};for(const [k0,v] of Object.entries(raw)){const k=TRAFFIC_ORDER.includes(k0)?k0:"other";by[k]=(by[k]||0)+v}
+ return Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>({k,label:k==="other"?"other":k==="offer_lp"?"offer page":PAGE_KIND_LABEL[k],pct:Math.round(v/tot*100)}));
+}
 
 // Every investigation as a case-file card. Uses the sidebar's category/flag/search filters, adds sorting and quick flags.
 const OWN:Record<string,{t:string;tone:string}>={identified:{t:"OWNER IDENTIFIED",tone:"ok"},legal_entity_only:{t:"LEGAL ENTITY ONLY",tone:"warn"},operator_unknown:{t:"OPERATOR UNKNOWN",tone:"bad"},contested:{t:"CONTESTED",tone:"bad"}};
@@ -16,12 +28,15 @@ const QUICK=[
  ["regulatory","Regulatory","Has FDA, FTC or other regulator action"],
  ["ownership:operator_unknown","Operator unknown","Nobody identified behind the brand yet"],
  ["network:*","In a network","Shares an owner with other brands"],
+ ["traffic:listicle","Listicles","Ads send traffic to listicles"],
+ ["traffic:advertorial","Advertorials","Ads send traffic to advertorial presell pages"],
+ ["traffic:quiz","Quiz funnels","Ads send traffic to a quiz"],
  ["needs-deep-dive","Needs deep dive","Ownership still has open questions"],
 ] as const;
 const SORTS={visits:"Traffic",revenue:"Est. revenue",ads:"Active ads",name:"Name"} as const;
 const caseNo=(id:string)=>{let h=7;for(const ch of id)h=(h*33+ch.charCodeAt(0))>>>0;return String(h%10000).padStart(4,"0")};
 
-export default function Portfolio({cases,total,flag,setFlag,onOpen,watched,onToggleWatch}:{cases:Case[];total:number;flag:string;setFlag:(f:string)=>void;onOpen:(id:string)=>void;watched?:Set<string>;onToggleWatch?:(id:string,on:boolean)=>void}){
+export default function Portfolio({cases,total,flag,setFlag,onOpen,watched,onToggleWatch,actions}:{cases:Case[];total:number;flag:string;setFlag:(f:string)=>void;onOpen:(id:string)=>void;watched?:Set<string>;onToggleWatch?:(id:string,on:boolean)=>void;actions?:React.ReactNode}){
  const [sort,setSort]=useState<keyof typeof SORTS>("visits");
  const list=useMemo(()=>[...cases].sort((a,b)=>{
   if(sort==="name")return a.name.localeCompare(b.name);
@@ -32,7 +47,7 @@ export default function Portfolio({cases,total,flag,setFlag,onOpen,watched,onTog
  return <div className="portfolio">
   <div className="pfHead">
    <div><div className="pfKicker">CASE FILES</div><h1>{cases.length===total?`${total} brands under investigation`:`${cases.length} of ${total} brands`}</h1><p>{compact(totals.visits)} monthly visits · ~{compact(totals.rev,"$")} est. monthly revenue across this view</p></div>
-   <label className="pfSort">Sort by<select value={sort} onChange={e=>setSort(e.target.value as keyof typeof SORTS)}>{Object.entries(SORTS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+   <div className="pfActions">{actions}<label className="pfSort">Sort by<select value={sort} onChange={e=>setSort(e.target.value as keyof typeof SORTS)}>{Object.entries(SORTS).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label></div>
   </div>
   <div className="pfChips" role="group" aria-label="Quick filters">{QUICK.map(([k,v,tip])=><button key={k} aria-pressed={flag===k} className={"tipped"+(flag===k?" on":"")} onClick={()=>setFlag(k)} data-tip={tip} aria-describedby={`tip-${k.replace(/[^a-z]/g,"")}`}>{v}</button>)}</div>
   <div className="sr">{QUICK.map(([k,,tip])=><span key={k} id={`tip-${k.replace(/[^a-z]/g,"")}`}>{tip}</span>)}</div>
@@ -47,6 +62,7 @@ export default function Portfolio({cases,total,flag,setFlag,onOpen,watched,onTog
     <span className="pfName">{x.name}</span>
     {x.domain?<SiteLink className="pfDomain" domain={x.domain}/>:<span className="pfDomain">—</span>}
     <span className="pfNums"><span><small>VISITS</small><b>{m?.monthlyVisits!=null?compact(m.monthlyVisits):"—"}</b></span><span><small>EST. REV</small><b>{m?.revenue?compact(m.revenue.mid,cur):"—"}</b></span><span><small>ADS</small><b>{m?.metaActiveAds!=null?compact(m.metaActiveAds):"—"}</b></span></span>
+    {(()=>{const tm=trafficMix(x);return tm.length>0&&<span className="pfTraffic" title="Share of live ads by the type of page they send people to">Traffic → {tm.map(t=><em key={t.k} className={"tk-"+t.k}>{t.label} {t.pct}%</em>)}</span>})()}
     {(net||flags.length>0)&&<span className="pfFlags">{net&&<em className="net">{net}</em>}{flags.map(f=><em key={f}>{f}</em>)}</span>}
    </div></div>})}</div>:<p className="pfEmpty">No brands match these filters.</p>}
  </div>;
