@@ -74,7 +74,7 @@ export async function checkInvestigation(id:string):Promise<{changes:Change[];ch
  if(metrics&&metrics===c.metrics&&profile!==c.profile)metrics={...metrics,subscription:subscriptionFor(metrics,profile?.identifiers?.subscriptionApp,marketing?.strategy?.offers,profile?.identifiers?.sellingPlans,profile?.identifiers?.subscriptionOverride)};
  const next=snapshotOf(metrics,marketing,await linkedCases({...c,marketing}).catch(()=>prev.linked));
  const changes=diff(prev,next);
- if(changes.length)await db("oi_watch_changes",{method:"POST",body:JSON.stringify(changes.map(x=>({investigation_id:id,...x})))});
+ if(changes.length)await db("oi_watch_changes",{method:"POST",body:JSON.stringify(changes.map(x=>({investigation_id:id,kind:x.kind,severity:x.severity,title:x.title,detail:x.detail??null})))});
  await db("oi_watch_snapshots",{method:"POST",body:JSON.stringify({investigation_id:id,data:next})});
  if(metrics!==c.metrics||marketing!==c.marketing||profile!==c.profile)await refreshMarketing({...c,metrics,marketing,profile});
  return {changes,checked:true,sources,landingPages:marketing?.landing?.landingPages?.length};
