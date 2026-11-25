@@ -10,7 +10,7 @@ export async function GET(req:NextRequest){
  if(!id)return Response.json({error:"investigationId is required"},{status:400});
  try{
   const c=await getInvestigation(id);if(!c)return Response.json({error:"Investigation not found"},{status:404});
-  const main=c.marketing?.landing?.advertisers?.find(a=>a.role==="main")?.id||null;
+  const main=c.marketing?.landing?.brandId||c.marketing?.landing?.advertisers?.find(a=>a.role==="main")?.id||null;
   return Response.json(await fetchCreatives(c.domain||"",main));
  }catch(e){return Response.json({creatives:[],error:e instanceof Error?e.message:"Could not load creatives"},{status:500})}
 }

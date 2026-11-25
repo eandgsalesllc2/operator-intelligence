@@ -33,6 +33,7 @@ export type Marketing={
  funnel?:{landingDomains?:string[];usesPresellOrAdvertorial?:boolean|null;checkoutSubdomains?:string[];notes?:string}|null;
  // Running landing pages from Atria's ad library (landing URLs) plus BrandSearch funnel types.
  landing?:{asOf?:string;source?:string;notes?:string;totalActiveAds?:number;sampledActiveAds?:number;
+  brandId?:string; // Atria unified brand id (UUID)
   advertisers?:{id:string;name:string;totalAds?:number;role?:string}[];
   landingPages?:{url:string;host?:string;path?:string;kind?:string;activeAds?:number;bestRank?:number|null;maxDaysRunning?:number|null;pages?:string[];headline?:string|null;status?:string;finalUrl?:string;title?:string|null;offsite?:boolean;checkedBy?:string}[];
   hosts?:{host:string;activeAds:number}[];kindMix?:Record<string,number>;brandsearchFunnelMix?:Record<string,number>|null}|null;

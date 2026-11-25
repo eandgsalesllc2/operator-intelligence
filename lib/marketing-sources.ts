@@ -15,23 +15,27 @@ function qs(q:Q){const u=new URLSearchParams();for(const [k,v] of Object.entries
 // Retries rate limits (429) and server errors with backoff; 404 means "no such brand" and returns null.
 const errors:string[]=[];
 export const trace:string[]=[]; // per-call log for /api/integrations diagnostics
-async function get(base:string,key:string|undefined,path:string,q:Q={}){
+async function get(base:string,key:string|undefined,path:string,q:Q={},body?:unknown){
  if(!key)throw new Error("not configured");
  for(let attempt=0;;attempt++){
   const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),20000);
   try{
-   const r=await fetch(base+path+qs(q),{headers:{"X-API-Key":key,Accept:"application/json"},signal:ctl.signal,cache:"no-store"});
-   trace.push(`${r.status} ${path}${qs(q)}`);
+   const r=await fetch(base+path+qs(q),{method:body===undefined?"GET":"POST",headers:{"X-API-Key":key,Accept:"application/json",...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),signal:ctl.signal,cache:"no-store"});
+   trace.push(`${r.status} ${body===undefined?"":"POST "}${path}${qs(q)}`);
    if(r.status===404)return null;
    if((r.status===429||r.status>=500)&&attempt<3){const wait=Math.min(8000,(+(r.headers.get("retry-after")||0)*1000)||1500*2**attempt);await new Promise(res=>setTimeout(res,wait));continue}
    if(!r.ok){const msg=`${r.status} ${(await r.text()).slice(0,160)}`;errors.push(`${new URL(base).hostname}${path.split("?")[0]}: ${msg}`);throw new Error(msg)}
-   const body=await r.json();const n=body?.data?.items?.length;if(n!=null)trace[trace.length-1]+=` → ${n} items`;return body;
+   const json=await r.json();
+   // Atria answers some failures (bad params, removed endpoints) with HTTP 200 and a non-zero `code`. 40401 = not found.
+   if(typeof json?.code==="number"&&json.code!==0){if(json.code===40401)return null;const msg=`code ${json.code}: ${String(json.message||"").slice(0,160)}`;errors.push(`${new URL(base).hostname}${path.split("?")[0]}: ${msg}`);throw new Error(msg)}
+   const n=json?.data?.items?.length;if(n!=null)trace[trace.length-1]+=` → ${n} items`;return json;
   }catch(e){if(ctl.signal.aborted&&attempt<1)continue;throw e}
   finally{clearTimeout(t)}
  }
 }
 const bs=(path:string,q?:Q)=>get(BS,process.env.BRANDSEARCH_API_KEY,path,q);
 const atria=(path:string,q?:Q)=>get(ATRIA,process.env.ATRIA_API_KEY,path,q);
+const atriaPost=(path:string,body:unknown)=>get(ATRIA,process.env.ATRIA_API_KEY,path,{},body);
 const settle=async<T,>(p:Promise<T>)=>{try{return await p}catch{return null}};
 const num=(v:any)=>typeof v==="number"&&isFinite(v)?v:null;
 const sortedKeys=(o:any)=>Object.entries(o||{}).filter(([,v])=>typeof v==="number"&&(v as number)>0).sort((a,b)=>(b[1] as number)-(a[1] as number)).map(([k])=>k);
@@ -104,39 +108,40 @@ async function fromBrandsearch(domain:string):Promise<{metrics?:Metrics;marketin
 // Page types (PDP, listicle, advertorial, quiz…) come from lib/page-type.ts.
 function unwrap(u:string){try{const x=new URL(u);if(/(^|\.)facebook\.com$/.test(x.hostname)&&x.pathname==="/l.php"){const inner=x.searchParams.get("u");if(inner)return inner}return u}catch{return u}}
 
+// Atria's API (v0.2.0, Oct 2026): brands come from POST /inspo-brands/search, which matches on the brand's own
+// hosts, and their ads from GET /ad-library/search scoped to that brand (every advertiser that runs its ads).
+const isUuid=(s:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+const adScope=(id:string)=>isUuid(id)?{unified_brand_id:[id]}:{brand_id:[id]};
+async function atriaAds(scope:Q,status:"active"|"inactive",pagesN:number,pageSize=50){
+ const out:any[]=[];let cursor:string|undefined;let total=0;
+ for(let i=0;i<pagesN;i++){
+  const r=await atria("/ad-library/search",{...scope,status:[status],order:status==="active"?"most_impressions":"recently_ended",page_size:pageSize,cursor});
+  const d=r?.data;if(!d)break;if(i===0)total=d.total||0;out.push(...(d.items||[]));cursor=d.cursor||undefined;if(!cursor)break;
+ }
+ return {ads:out,total};
+}
+
 async function fromAtria(domain:string,brandName:string){
  const root=rootDomain(domain);const stem=nameStem(domain);
- const words=[brandName.replace(/\.[a-z]{2,}$/i,"").trim(),stem].filter((w,i,a)=>w.length>=3&&!/\.|^www/i.test(w)&&a.indexOf(w)===i);
+ const onRoot=(h:string)=>{const x=bare(h||"");return x===root||x.endsWith("."+root)};
+ const ownsRoot=(b:any)=>[b.primary_host,...(b.hosts||[])].some((h:string)=>h&&onRoot(h));
+ // By host first (exact), then by name — but a name match still has to own this domain.
  const cands=new Map<string,any>();
- for(const w of words){const r=await settle(atria("/brand-library/search",{keyword:w,platform:["meta_ad_library"],page_size:10}));for(const b of r?.data?.items||[])cands.set(b.id,b)}
- const hostOf=(u:string)=>{try{return bare(new URL(unwrap(u)).hostname)}catch{return ""}};
- const linksHere=(ads:any[])=>ads.some(a=>hostOf(a.link_url||"").endsWith(root));
- // Keep only brands whose site is this domain, or whose ads link to it (name matches alone are not enough).
- const verified:any[]=[];
- // Multi-word keywords match any word, so rank by how well the name matches before ad volume.
- const norm=(x:string)=>x.toLowerCase().replace(/[^a-z0-9]/g,"");
- const want=[stem,...words.map(norm)].filter(w=>w.length>=3);
- const score=(b:any)=>{const n=norm(b.name||"");return want.some(w=>n===w)?3:want.some(w=>n.startsWith(w)||w.startsWith(n)&&n.length>=4)?2:want.some(w=>n.includes(w))?1:0};
- const ranked=[...cands.values()].map(b=>({b,s:score(b)})).filter(x=>x.s>0).sort((x,y)=>y.s-x.s||(y.b.ad_num||0)-(x.b.ad_num||0)).slice(0,6).map(x=>x.b);
- const sampled=new Map<string,any[]>();
- for(const b of ranked){ // one at a time: Atria rate-limits bursts
-  if(b.website_url&&hostOf(b.website_url).endsWith(root)){verified.push(b);continue}
-  const r=await settle(atria(`/brand-library/${encodeURIComponent(b.id)}/ads`,{status:["active"],order:"most_impressions",page_size:20}));
-  const items=r?.data?.items||[];sampled.set(b.id,items);
-  if(linksHere(items))verified.push(b);
-  if(verified.length>=3)break;
- }
- if(!verified.length)return {note:`No Atria advertiser links to ${root}`};
- verified.sort((a,b)=>(b.ad_num||0)-(a.ad_num||0));
- const main=verified.find(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,"").includes(stem))||verified[0];
- const pull=async(b:any,status:"active"|"inactive",pagesN:number)=>{const out:any[]=[];let cursor:string|undefined;let total=0;
-  for(let i=0;i<pagesN;i++){const r=await settle(atria(`/brand-library/${encodeURIComponent(b.id)}/ads`,{status:[status],order:status==="active"?"most_impressions":"recently_ended",page_size:50,cursor}));const d=r?.data;if(!d)break;if(i===0)total=d.total||0;out.push(...(d.items||[]));cursor=d.cursor||undefined;if(!cursor)break}
-  return {ads:out,total}};
- let {ads:mainAds,total}=await pull(main,"active",2);let status:"active"|"inactive"="active";
- if(!mainAds.length&&sampled.get(main.id)?.length)mainAds=sampled.get(main.id)!; // fall back to the ads seen while matching
- if(!mainAds.length){status="inactive";mainAds=(await pull(main,"inactive",1)).ads}
- const others=verified.filter(b=>b!==main&&(b.ad_num||0)>=20).slice(0,2);
- const otherAds=(await Promise.all(others.map(b=>pull(b,"active",1)))).flatMap(x=>x.ads).filter(a=>hostOf(a.link_url||"").endsWith(root));
+ const search=async(library:Record<string,unknown>)=>{const r=await atriaPost("/inspo-brands/search",{scope:"library",library:{...library,limit:20}});for(const b of r?.data?.items||[])if(ownsRoot(b))cands.set(b.id,b)};
+ await search({host:root});
+ if(!cands.size){const words=[brandName.replace(/\.[a-z]{2,}$/i,"").trim(),stem].filter((w,i,a)=>w.length>=3&&!/\.|^www/i.test(w)&&a.indexOf(w)===i);for(const w of words){await search({brand_name:w});if(cands.size)break}}
+ if(!cands.size)return {note:`No Atria brand owns ${root}`};
+ const brand=[...cands.values()].sort((x,y)=>Number(onRoot(y.primary_host||""))-Number(onRoot(x.primary_host||""))||(y.ads?.active||0)-(x.ads?.active||0))[0];
+ const advs:any[]=brand.advertisers||[];
+ const mainAdv=advs.find(a=>a.main)||advs.find(a=>a.official)||advs[0];
+ // Ads for the whole brand; if the brand scope comes back empty, fall back to its main advertiser.
+ let scope:Q=adScope(brand.id);
+ let {ads:mainAds,total}=await atriaAds(scope,"active",2);let status:"active"|"inactive"="active";
+ if(!mainAds.length&&mainAdv?.id){scope=adScope(String(mainAdv.id));({ads:mainAds,total}=await atriaAds(scope,"active",2))}
+ if(!mainAds.length){status="inactive";mainAds=(await atriaAds(scope,"inactive",1)).ads}
+ const otherAds:any[]=[];
+ const main={id:String(mainAdv?.id||brand.id),name:mainAdv?.name||brand.name||root,ad_num:mainAdv?.total_ads??brand.ads?.total};
+ const verified=[main,...advs.filter(a=>a!==mainAdv&&(a.official||(a.total_ads||0)>=20)).slice(0,6).map(a=>({id:String(a.id),name:a.name||"?",ad_num:a.total_ads}))];
  const groups=new Map<string,any>();
  for(const a of [...mainAds,...otherAds]){
   if(!a.link_url)continue;
@@ -152,10 +157,10 @@ async function fromAtria(domain:string,brandName:string){
  const hosts=new Map<string,number>();const kindMix:Record<string,number>={};
  for(const g of groups.values()){hosts.set(g.host,(hosts.get(g.host)||0)+g.activeAds);kindMix[g.kind]=(kindMix[g.kind]||0)+g.activeAds}
  const top=Object.entries(kindMix).sort((a,b)=>b[1]-a[1]);
- const landing:NonNullable<Marketing["landing"]>={asOf:new Date().toISOString().slice(0,10),source:"Atria ad library (landing URLs)",
-  advertisers:[main,...verified.filter(b=>b!==main)].map((b,i)=>({id:b.id,name:b.name,totalAds:b.ad_num,role:i===0?"main":"linking_page"})),
+ const landing:NonNullable<Marketing["landing"]>={asOf:new Date().toISOString().slice(0,10),source:"Atria ad library (landing URLs)",brandId:String(brand.id),
+  advertisers:verified.map((b,i)=>({id:b.id,name:b.name,totalAds:b.ad_num,role:i===0?"main":"linking_page"})),
   landingPages,hosts:[...hosts.entries()].sort((a,b)=>b[1]-a[1]).map(([host,activeAds])=>({host,activeAds})),kindMix,
-  sampledActiveAds:mainAds.length+otherAds.length,totalActiveAds:status==="active"?total:0,
+  sampledActiveAds:mainAds.length+otherAds.length,totalActiveAds:status==="active"?(total||brand.ads?.active||0):0,
   notes:landingPages.length?`${status==="inactive"?"No active ads; showing the most recently ended. ":""}Most ads go to ${top.slice(0,2).map(([k,v])=>`${PAGE_KIND_LABEL[k]||k} pages (${v})`).join(" and ")} across ${hosts.size} host${hosts.size>1?"s":""}.`:"The matched advertiser has no ads with landing URLs."};
  return {landing,note:`${landingPages.length} landing pages from ${main.name}`};
 }
@@ -180,8 +185,7 @@ export type Creative={id:string;image:string|null;video:string|null;format:strin
 export async function fetchCreatives(domain:string,atriaBrandId?:string|null,limit=24):Promise<{creatives:Creative[];source:string;note?:string}>{
  const clip=(s:any,n:number)=>String(s||"").replace(/\s+/g," ").trim().slice(0,n);
  if(atriaBrandId&&atriaEnabled()){
-  const r=await settle(atria(`/brand-library/${encodeURIComponent(atriaBrandId)}/ads`,{status:["active"],order:"most_impressions",page_size:Math.min(50,limit)}));
-  const items=(r?.data?.items||[]) as any[];
+  const items=(await atriaAds(adScope(atriaBrandId),"active",1,Math.min(50,limit)).catch(()=>({ads:[] as any[]}))).ads;
   if(items.length)return {source:"Atria ad library",creatives:items.map(a=>({id:String(a.id),image:a.images?.[0]?.url||a.videos?.[0]?.preview_image_url||null,video:a.videos?.[0]?.url||null,format:a.videos?.length?"video":a.display_format||"image",title:a.title?clip(a.title,120):null,body:clip(a.body||a.caption,280),cta:a.cta_text||null,page:a.brand_name||null,days:num(a.days_running),started:a.start_date||null,landing:a.link_url?unwrap(a.link_url):null,source:"atria" as const}))};
  }
  if(brandsearchEnabled()&&domain){
