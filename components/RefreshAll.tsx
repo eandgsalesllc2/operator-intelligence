@@ -5,7 +5,7 @@ import {RefreshCw,Square,Loader2} from "lucide-react";
 // One click re-checks every brand (BrandSearch traffic + Atria landing pages, no AI web research), stalest first,
 // a few at a time through /api/watchlist/check. Runs in this tab; progress is remembered so a closed tab can resume.
 type Run={startedAt:number;ids:string[];done:string[];failed:string[];skipped:string[];noLanding?:string[];sourceError?:string};
-const KEY="bt:refreshRun",AT_ONCE=3;
+const KEY="bt:refreshRun",AT_ONCE=1; // one at a time: Atria rate-limits per workspace
 const load=():Run|null=>{try{const r=JSON.parse(localStorage.getItem(KEY)||"null");return r&&Array.isArray(r.ids)?r:null}catch{return null}};
 const save=(r:Run|null)=>{try{r?localStorage.setItem(KEY,JSON.stringify(r)):localStorage.removeItem(KEY)}catch{}};
 const mins=(ms:number)=>ms<90e3?"under 2 min":`~${Math.round(ms/60e3)} min`;

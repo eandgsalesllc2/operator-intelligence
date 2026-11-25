@@ -23,8 +23,9 @@ async function get(base:string,key:string|undefined,path:string,q:Q={},body?:unk
    const r=await fetch(base+path+qs(q),{method:body===undefined?"GET":"POST",headers:{"X-API-Key":key,Accept:"application/json",...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),signal:ctl.signal,cache:"no-store"});
    trace.push(`${r.status} ${body===undefined?"":"POST "}${path}${qs(q)}`);
    if(r.status===404)return null;
-   if((r.status===429||r.status>=500)&&attempt<3){const wait=Math.min(8000,(+(r.headers.get("retry-after")||0)*1000)||1500*2**attempt);await new Promise(res=>setTimeout(res,wait));continue}
-   if(!r.ok){const msg=`${r.status} ${(await r.text()).slice(0,160)}`;errors.push(`${new URL(base).hostname}${path.split("?")[0]}: ${msg}`);throw new Error(msg)}
+   // Rate limits: honour Retry-After (Atria's workspace limit is per plan), up to 5 tries; server errors up to 3.
+   if((r.status===429&&attempt<5)||(r.status>=500&&attempt<3)){const wait=Math.min(r.status===429?20000:8000,(+(r.headers.get("retry-after")||0)*1000)||(r.status===429?3000:1500)*2**attempt);await new Promise(res=>setTimeout(res,wait));continue}
+   if(!r.ok){const rl=r.status===429?` [limit ${r.headers.get("ratelimit-policy")||"?"}; ${r.headers.get("ratelimit")||""}]`:"";const msg=`${r.status} ${(await r.text()).slice(0,160)}${rl}`;errors.push(`${new URL(base).hostname}${path.split("?")[0]}: ${msg}`);throw new Error(msg)}
    const json=await r.json();
    // Atria answers some failures (bad params, removed endpoints) with HTTP 200 and a non-zero `code`. 40401 = not found.
    if(typeof json?.code==="number"&&json.code!==0){if(json.code===40401)return null;const msg=`code ${json.code}: ${String(json.message||"").slice(0,160)}`;errors.push(`${new URL(base).hostname}${path.split("?")[0]}: ${msg}`);throw new Error(msg)}
